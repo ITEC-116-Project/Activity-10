@@ -447,7 +447,6 @@ const MyTickets = () => {
           />
         )}
       </div>
-      </div>
 
       {scannedAttendee && <AttendeeModal attendee={scannedAttendee} event={activeEvent} isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} onClose={() => setScannedAttendee(null)} />}
     </div>
