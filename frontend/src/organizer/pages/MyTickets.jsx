@@ -59,18 +59,31 @@ const MyTickets = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: 'environment',
+          facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
       });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(err => console.error('Play error:', err));
-        setCameraActive(true);
+        // Ensure video is ready to play
+        await new Promise(resolve => {
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play().then(() => {
+              setCameraActive(true);
+              resolve();
+            }).catch(err => {
+              console.error('Play error:', err);
+              setCameraActive(true);
+              resolve();
+            });
+          };
+        });
       }
     } catch (error) {
-      console.error('Camera error:', error);
+      console.error('Camera access error:', error);
+      setCameraActive(false);
       Swal.fire({
         icon: 'error',
         title: 'Camera Error',
@@ -229,18 +242,27 @@ const MyTickets = () => {
             overflow: 'hidden',
             backgroundColor: '#000',
             aspectRatio: '1',
-            maxHeight: '320px'
+            maxHeight: '320px',
+            position: 'relative'
           }}>
-            {cameraActive ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : (
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover', 
+                display: 'block',
+                backgroundColor: '#000'
+              }}
+            />
+            {!cameraActive && (
               <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 width: '100%',
                 height: '100%',
                 display: 'flex',
