@@ -489,31 +489,6 @@ const ParticipantsModal = ({ event, onClose }) => {
     });
   };
 
-  const exportCSV = () => {
-    const headers = ['Name', 'Email', 'Ticket ID', 'Registration Date', 'Check-in Status'];
-    const rows = participants.map(p => [
-      p.userName,
-      p.email || 'N/A',
-      p.ticketId,
-      new Date(p.registeredAt).toLocaleDateString('en-US'),
-      checkedInParticipants.has(p.id) ? 'Checked In' : 'Pending'
-    ]);
-
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += headers.join(',') + '\n';
-    rows.forEach(row => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${event.title.replace(/\s+/g, '_')}_attendees.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const exportPDF = () => {
     const doc = new jsPDF();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -582,13 +557,6 @@ const ParticipantsModal = ({ event, onClose }) => {
               style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               📱 QR Scanner
-            </button>
-            <button 
-              className="btn-secondary"
-              onClick={exportCSV}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <MdFileDownload /> CSV
             </button>
             <button 
               className="btn-secondary"
