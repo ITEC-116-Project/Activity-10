@@ -58,13 +58,19 @@ const MyTickets = () => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(err => console.error('Play error:', err));
         setCameraActive(true);
       }
     } catch (error) {
+      console.error('Camera error:', error);
       Swal.fire({
         icon: 'error',
         title: 'Camera Error',
@@ -229,8 +235,9 @@ const MyTickets = () => {
               <video
                 ref={videoRef}
                 autoPlay
+                muted
                 playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               />
             ) : (
               <div style={{

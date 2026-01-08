@@ -24,7 +24,7 @@ const SideNav = ({ activeSection, onChange }) => {
           onClick={() => onChange('mytickets')}
         >
           <MdConfirmationNumber className="icon" />
-          <span>My Ticket</span>
+          <span>Active Event</span>
         </button>
         <button
           className={`nav-item ${activeSection === 'reports' ? 'active' : ''}`}
