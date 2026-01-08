@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/OrganizerDashboard.css';
+import SideNav from '../components/SideNav.jsx';
+import Home from './Home.jsx';
+import Events from './Events.jsx';
+import MyTickets from './MyTickets.jsx';
+import Reports from './Reports.jsx';
 
 const OrganizerDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('');
+  const [activeSection, setActiveSection] = useState('home');
+  const [selectedEventForEdit, setSelectedEventForEdit] = useState(null);
+  const [hasTicket, setHasTicket] = useState(false);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
@@ -17,6 +25,23 @@ const OrganizerDashboard = () => {
 
     const storedName = localStorage.getItem('firstName') || 'Organizer';
     setUserName(storedName);
+    // Check if organizer has any tickets stored locally
+    const loadTickets = () => {
+      try {
+        const raw = localStorage.getItem('myTickets');
+        const tickets = raw ? JSON.parse(raw) : [];
+        setHasTicket(Array.isArray(tickets) && tickets.length > 0);
+      } catch {
+        setHasTicket(false);
+      }
+    };
+
+    loadTickets();
+    const onStorage = (e) => {
+      if (e.key === 'myTickets') loadTickets();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [navigate]);
 
   const handleLogout = () => {
@@ -24,38 +49,38 @@ const OrganizerDashboard = () => {
     navigate('/login');
   };
 
+  const renderContent = () => {
+    switch(activeSection) {
+      case 'home':
+        return <Home onRedirectToEdit={(event) => { setSelectedEventForEdit(event); setActiveSection('events'); }} />;
+      case 'events':
+        return <Events initialEventToEdit={selectedEventForEdit} onClearEditEvent={() => setSelectedEventForEdit(null)} />;
+      case 'mytickets':
+        return <MyTickets />;
+      case 'reports':
+        return <Reports />;
+      default:
+        return <Home />;
+    }
+  };
+
   return (
     <div className="organizer-dashboard">
       <div className="dashboard-header">
         <h1>Organizer Dashboard</h1>
-        <button onClick={handleLogout} className="logout-button">Logout</button>
+        <div className="header-right">
+          <span className="user-greeting">Welcome, {userName}!</span>
+          <button onClick={handleLogout} className="logout-button">Logout</button>
+        </div>
       </div>
-      <div className="dashboard-content">
-        <div className="welcome-card">
-          <h2>Welcome, {userName}!</h2>
-          <p>You are logged in as an Event Organizer</p>
-        </div>
-        <div className="dashboard-cards">
-          <div className="dashboard-card">
-            <h3>My Events</h3>
-            <p>View and manage your events</p>
-          </div>
-          <div className="dashboard-card">
-            <h3>Create Event</h3>
-            <p>Create a new event</p>
-          </div>
-          <div className="dashboard-card">
-            <h3>Attendees</h3>
-            <p>View event attendees</p>
-          </div>
-          <div className="dashboard-card">
-            <h3>Analytics</h3>
-            <p>View event analytics</p>
-          </div>
-        </div>
+      
+      <div className="dashboard-layout">
+        <SideNav activeSection={activeSection} onChange={setActiveSection} />
+        <main className="main-content">
+          {renderContent()}
+        </main>
       </div>
     </div>
   );
 };
-
 export default OrganizerDashboard;
