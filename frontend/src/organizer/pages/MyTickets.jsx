@@ -2,6 +2,20 @@ import React, { useEffect, useState, useRef } from 'react';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
 
+// Add jsQR library dynamically
+const loadJsQR = () => {
+  return new Promise(resolve => {
+    if (window.jsQR) {
+      resolve();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+      script.onload = () => resolve();
+      document.head.appendChild(script);
+    }
+  });
+};
+
 const MyTickets = () => {
   const [activeEvent, setActiveEvent] = useState({
     id: 2,
@@ -29,16 +43,22 @@ const MyTickets = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkedInParticipants, setCheckedInParticipants] = useState(new Set());
   const [cameraActive, setCameraActive] = useState(false);
+  const [scannedAttendee, setScannedAttendee] = useState(null);
+  const [lastScannedCode, setLastScannedCode] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const scanIntervalRef = useRef(null);
 
   const itemsPerPage = 10;
 
   useEffect(() => {
-    startCamera();
+    loadJsQR().then(() => startCamera());
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
       }
     };
   }, []);
@@ -72,10 +92,12 @@ const MyTickets = () => {
           videoRef.current.onloadedmetadata = () => {
             videoRef.current.play().then(() => {
               setCameraActive(true);
+              startQRScanning();
               resolve();
             }).catch(err => {
               console.error('Play error:', err);
               setCameraActive(true);
+              startQRScanning();
               resolve();
             });
           };
@@ -90,6 +112,51 @@ const MyTickets = () => {
         text: 'Could not access camera. Please check permissions.',
         confirmButtonColor: '#0f766e'
       });
+    }
+  };
+
+  const startQRScanning = () => {
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    
+    scanIntervalRef.current = setInterval(() => {
+      if (!videoRef.current || !canvasRef.current) return;
+      
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
+
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      try {
+        if (!window.jsQR) return;
+        
+        const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code && code.data !== lastScannedCode) {
+          setLastScannedCode(code.data);
+          handleQRScanned(code.data);
+        }
+      } catch (error) {
+        // Silent error handling for QR scanning
+      }
+    }, 200);
+  };
+
+  const handleQRScanned = (qrData) => {
+    const attendee = participants.find(p => p.ticketId === qrData);
+    
+    if (attendee) {
+      setScannedAttendee(attendee);
+      // Auto check-in
+      if (!checkedInParticipants.has(attendee.id)) {
+        setCheckedInParticipants(prev => new Set([...prev, attendee.id]));
+      }
     }
   };
 
@@ -281,11 +348,8 @@ const MyTickets = () => {
           
           {cameraActive && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-secondary" onClick={captureFrame} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
-                📸 Capture
-              </button>
               <button className="btn-secondary" onClick={stopCamera} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
-                Stop
+                Stop Camera
               </button>
             </div>
           )}
@@ -382,6 +446,91 @@ const MyTickets = () => {
             onPageChange={setCurrentPage}
           />
         )}
+      </div>
+      </div>
+
+      {scannedAttendee && <AttendeeModal attendee={scannedAttendee} event={activeEvent} isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} onClose={() => setScannedAttendee(null)} />}
+    </div>
+  );
+};
+
+const AttendeeModal = ({ attendee, event, isCheckedIn, onClose }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div style={{ 
+          padding: '40px 30px', 
+          textAlign: 'center', 
+          background: 'linear-gradient(135deg, #d4f1e8 0%, #e8f9f5 100%)', 
+          borderRadius: '16px'
+        }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '40px 30px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+            {/* Event Name */}
+            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Event Name</p>
+            <p style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '700', color: '#0f766e' }}>{event.title}</p>
+
+            {/* Ticket ID */}
+            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Ticket ID</p>
+            <p style={{ margin: '0 0 30px 0', fontSize: '14px', color: '#666', fontFamily: 'monospace' }}>{attendee.ticketId}</p>
+
+            {/* QR Code Placeholder */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '30px 0' }}>
+              <div style={{ 
+                width: '200px', 
+                height: '200px', 
+                backgroundColor: '#f3f4f6', 
+                borderRadius: '12px', 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px dashed #d1d5db'
+              }}>
+                <p style={{ color: '#9ca3af', margin: 0 }}>✓ QR Scanned</p>
+              </div>
+            </div>
+
+            {/* Attendee Info */}
+            <p style={{ margin: '30px 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Attendee Name</p>
+            <p style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>{attendee.userName}</p>
+
+            <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Email</p>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.email || '—'}</p>
+
+            {attendee.company && (
+              <>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Company Name</p>
+                <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.company}</p>
+              </>
+            )}
+
+            {/* Check-in Status */}
+            <div style={{ 
+              marginTop: '20px', 
+              padding: '15px', 
+              backgroundColor: isCheckedIn ? '#d1fae5' : '#fef3c7', 
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ 
+                margin: '0', 
+                fontSize: '16px', 
+                fontWeight: '700',
+                color: isCheckedIn ? '#065f46' : '#92400e'
+              }}>
+                {isCheckedIn ? '✓ Checked In' : 'Pending Check-in'}
+              </p>
+            </div>
+
+            {/* OK Button */}
+            <button 
+              className="btn-primary" 
+              onClick={onClose}
+              style={{ width: '100%', padding: '12px', fontSize: '16px', marginTop: '20px' }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
