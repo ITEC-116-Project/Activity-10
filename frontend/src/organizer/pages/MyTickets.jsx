@@ -34,6 +34,15 @@ const MyTickets = () => {
 
   const itemsPerPage = 10;
 
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   const filteredParticipants = participants.filter(p => {
     const matchesSearch = 
       p.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,7 +165,7 @@ const MyTickets = () => {
         <h2>Active Event - On-Site Check-In</h2>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '30px' }}>
         {/* Left: Event Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
@@ -207,13 +216,14 @@ const MyTickets = () => {
         </div>
 
         {/* Right: Camera Feed */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{
             border: '3px solid #0f766e',
             borderRadius: '12px',
             overflow: 'hidden',
             backgroundColor: '#000',
-            aspectRatio: '1'
+            aspectRatio: '1',
+            maxHeight: '320px'
           }}>
             {cameraActive ? (
               <video
@@ -240,22 +250,16 @@ const MyTickets = () => {
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} width={320} height={320} />
           
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {!cameraActive ? (
-              <button className="btn-primary" onClick={startCamera} style={{ flex: 1 }}>
-                📱 Start Camera
+          {cameraActive && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn-secondary" onClick={captureFrame} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
+                📸 Capture
               </button>
-            ) : (
-              <>
-                <button className="btn-secondary" onClick={captureFrame} style={{ flex: 1 }}>
-                  📸 Capture Frame
-                </button>
-                <button className="btn-secondary" onClick={stopCamera} style={{ flex: 1 }}>
-                  Stop
-                </button>
-              </>
-            )}
-          </div>
+              <button className="btn-secondary" onClick={stopCamera} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
+                Stop
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
