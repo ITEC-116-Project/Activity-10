@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { MdDelete } from 'react-icons/md';
+import { MdDelete, MdFileDownload } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const Events = ({ initialEventToEdit, onClearEditEvent }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [editEventData, setEditEventData] = useState(null);
   const [viewMode, setViewMode] = useState('card');
@@ -110,9 +113,6 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
     <div className="section">
       <div className="section-header" style={{ marginBottom: '0' }}>
         <h2>Events Management</h2>
-        {/* <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-secondary">View List</button>
-        </div> */}
       </div>
 
       <div className="search-bar">
@@ -232,10 +232,13 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
       )}
 
       {showDetailsModal && selectedEvent && (
-        <EventDetailsModal event={selectedEvent} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} />
+        <EventDetailsModal event={selectedEvent} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
       )}
       {showEditModal && editEventData && (
         <EditEventModal event={editEventData} onClose={() => { setShowEditModal(false); setEditEventData(null); }} />
+      )}
+      {showParticipantsModal && selectedEvent && (
+        <ParticipantsModal event={selectedEvent} onClose={() => { setShowParticipantsModal(false); setSelectedEvent(null); }} />
       )}
     </div>
   );
@@ -360,179 +363,7 @@ const EditEventModal = ({ event, onClose }) => {
   );
 };
 
-const CreateEventModal = ({ onClose }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    date: '',
-    time: '',
-    location: '',
-    capacity: '',
-    category: ''
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Create event:', formData);
-    onClose();
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Create New Event</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Event Title *</label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Enter event title"
-            />
-          </div>
-          <div className="form-group">
-            <label>Description *</label>
-            <textarea
-              required
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter event description"
-              rows="4"
-            />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Date *</label>
-              <input
-                type="date"
-                required
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Time *</label>
-              <input
-                type="time"
-                required
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Location *</label>
-            <input
-              type="text"
-              required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="Enter event location"
-            />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Capacity *</label>
-              <input
-                type="number"
-                required
-                value={formData.capacity}
-                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                placeholder="Max attendees"
-              />
-            </div>
-            <div className="form-group">
-              <label>Category *</label>
-              <select
-                required
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                <option value="">Select category</option>
-                <option value="conference">Conference</option>
-                <option value="workshop">Workshop</option>
-                <option value="seminar">Seminar</option>
-                <option value="meetup">Meetup</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">Create Event</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const EventDetailsModal = ({ event, onClose }) => {
-  const userName = localStorage.getItem('firstName') || 'Admin';
-  const [isRegistered, setIsRegistered] = useState(() => {
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.some(t => t.eventId === event.id && t.userName === userName);
-    } catch {
-      return false;
-    }
-  });
-
-  const handleRegister = () => {
-    const ticketId = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    const qrData = JSON.stringify({ ticketId, eventId: event.id, eventTitle: event.title, userName });
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
-
-    const ticket = {
-      id: ticketId,
-      ticketId,
-      eventId: event.id,
-      eventTitle: event.title,
-      date: event.date,
-      time: event.time,
-      location: event.location,
-      status: event.status,
-      registeredAt: new Date().toISOString(),
-      userName,
-      qrCode: qrUrl
-    };
-
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      tickets.push(ticket);
-      localStorage.setItem('myTickets', JSON.stringify(tickets));
-      Swal.fire({
-        icon: 'success',
-        title: 'Registration Successful!',
-        html: `<div style="text-align: left;">
-          <div style="background: #f0f9f8; padding: 10px; margin: 8px 0; border-left: 3px solid #0f766e; border-radius: 4px;">
-            <strong style="color: #0f766e;">Ticket ID:</strong> ${ticketId}
-          </div>
-          <div style="margin: 8px 0;"><strong style="color: #333;">Event:</strong> ${event.title}</div>
-          <div style="margin: 8px 0;"><strong style="color: #333;">Attendee:</strong> ${userName}</div>
-        </div>`,
-        confirmButtonColor: '#0f766e',
-        confirmButtonText: 'OK'
-      });
-      setIsRegistered(true);
-      onClose();
-    } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Registration Failed',
-        text: 'Please try again.',
-        confirmButtonColor: '#dc2626'
-      });
-    }
-  };
-
+const EventDetailsModal = ({ event, onClose, onShowParticipants }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -605,12 +436,252 @@ const EventDetailsModal = ({ event, onClose }) => {
             <button className="btn-secondary" onClick={onClose}>Close</button>
             <button
               className="btn-primary"
-              style={{ background: isRegistered ? '#9ca3af' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', cursor: isRegistered ? 'not-allowed' : 'pointer' }}
-              onClick={handleRegister}
-              disabled={isRegistered}
+              onClick={onShowParticipants}
+              style={{ background: 'linear-gradient(135deg, #0f766e 0%, #054e48 100%)' }}
             >
-              {isRegistered ? '✓ Already Registered' : 'Register'}
+              Participants
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ParticipantsModal = ({ event, onClose }) => {
+  const [participants, setParticipants] = useState(() => {
+    try {
+      const raw = localStorage.getItem('myTickets');
+      const tickets = raw ? JSON.parse(raw) : [];
+      return tickets.filter(t => t.eventId === event.id);
+    } catch {
+      return [];
+    }
+  });
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [checkedInParticipants, setCheckedInParticipants] = useState(new Set());
+
+  const itemsPerPage = 10;
+
+  const filteredParticipants = participants.filter(p => {
+    const matchesSearch = 
+      p.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.email && p.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      p.ticketId.includes(searchTerm);
+    return matchesSearch;
+  });
+
+  const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentParticipants = filteredParticipants.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleCheckIn = (participantId) => {
+    setCheckedInParticipants(prev => new Set([...prev, participantId]));
+    Swal.fire({
+      icon: 'success',
+      title: 'Checked In!',
+      text: 'Participant successfully checked in.',
+      confirmButtonColor: '#0f766e',
+      confirmButtonText: 'OK'
+    });
+  };
+
+  const exportCSV = () => {
+    const headers = ['Name', 'Email', 'Ticket ID', 'Registration Date', 'Check-in Status'];
+    const rows = participants.map(p => [
+      p.userName,
+      p.email || 'N/A',
+      p.ticketId,
+      new Date(p.registeredAt).toLocaleDateString('en-US'),
+      checkedInParticipants.has(p.id) ? 'Checked In' : 'Pending'
+    ]);
+
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    csvContent += headers.join(',') + '\n';
+    rows.forEach(row => {
+      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${event.title.replace(/\s+/g, '_')}_attendees.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    doc.setFontSize(16);
+    doc.setTextColor(15, 118, 110);
+    doc.text(`${event.title} - Attendee List`, 14, 20);
+
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    const eventDate = new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Date: ${eventDate}`, 14, 28);
+    doc.text(`Location: ${event.location}`, 14, 35);
+    doc.text(`Total Attendees: ${participants.length}`, 14, 42);
+
+    const tableData = participants.map(p => [
+      p.userName,
+      p.email || 'N/A',
+      p.ticketId,
+      new Date(p.registeredAt).toLocaleDateString('en-US'),
+      checkedInParticipants.has(p.id) ? '✓' : '—'
+    ]);
+
+    doc.autoTable({
+      head: [['Name', 'Email', 'Ticket ID', 'Registration Date', 'Check-in']],
+      body: tableData,
+      startY: 50,
+      theme: 'striped',
+      headerStyles: {
+        fillColor: [15, 118, 110],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      margin: { top: 50 }
+    });
+
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generated on ${new Date().toLocaleString('en-US')}`, 14, pageHeight - 10);
+
+    doc.save(`${event.title.replace(/\s+/g, '_')}_attendees.pdf`);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Participants - {event.title}</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div style={{ padding: '20px 30px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Search by name, email, or ticket ID..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ flex: 1, minWidth: '250px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+            />
+            <button 
+              className="btn-secondary"
+              onClick={() => setScannerOpen(!scannerOpen)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              📱 QR Scanner
+            </button>
+            <button 
+              className="btn-secondary"
+              onClick={exportCSV}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <MdFileDownload /> CSV
+            </button>
+            <button 
+              className="btn-secondary"
+              onClick={exportPDF}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <MdFileDownload /> PDF
+            </button>
+          </div>
+
+          {scannerOpen && (
+            <div style={{
+              padding: '15px',
+              backgroundColor: '#f0f9f8',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              border: '2px dashed #0f766e'
+            }}>
+              <p style={{ margin: '0 0 10px 0', fontWeight: '600', color: '#0f766e' }}>📱 QR Code Scanner</p>
+              <p style={{ margin: '0', fontSize: '13px', color: '#666' }}>Click on a participant's QR code to simulate scanning, or use device camera.</p>
+              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>Note: Enable camera access when prompted by your browser.</p>
+            </div>
+          )}
+
+          <div className="events-table-container">
+            <table className="events-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Ticket ID</th>
+                  <th>Registration Date</th>
+                  <th>Check-in Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentParticipants.length > 0 ? (
+                  currentParticipants.map(p => (
+                    <tr key={p.id}>
+                      <td><strong>{p.userName}</strong></td>
+                      <td>{p.email || '—'}</td>
+                      <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{p.ticketId}</td>
+                      <td>{new Date(p.registeredAt).toLocaleDateString('en-US')}</td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          backgroundColor: checkedInParticipants.has(p.id) ? '#d1fae5' : '#fef3c7',
+                          color: checkedInParticipants.has(p.id) ? '#065f46' : '#92400e'
+                        }}>
+                          {checkedInParticipants.has(p.id) ? '✓ Checked In' : '⏳ Pending'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {!checkedInParticipants.has(p.id) ? (
+                          <button
+                            className="btn-secondary"
+                            onClick={() => handleCheckIn(p.id)}
+                            style={{ padding: '5px 10px', fontSize: '12px' }}
+                          >
+                            Check In
+                          </button>
+                        ) : (
+                          <span style={{ color: '#0f766e', fontWeight: '600' }}>✓ Done</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>
+                      <p style={{ margin: '0', color: '#999' }}>No participants found</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredParticipants.length > itemsPerPage && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          )}
+
+          <div className="modal-actions" style={{ marginTop: '20px' }}>
+            <button className="btn-secondary" onClick={onClose}>Close</button>
           </div>
         </div>
       </div>
