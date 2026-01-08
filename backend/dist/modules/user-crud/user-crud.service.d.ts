@@ -1,7 +1,7 @@
 import { Repository } from 'typeorm';
-import { User } from '../../typeorm/entities/users';
+import { Users } from '../../typeorm/entities/users';
 export declare class UserCrudService {
     private userRepository;
-    constructor(userRepository: Repository<User>);
-    findAll(): Promise<User[]>;
+    constructor(userRepository: Repository<Users>);
+    findAll(): Promise<Users[]>;
 }

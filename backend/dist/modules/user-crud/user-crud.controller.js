@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserCrudController = void 0;
 const common_1 = require("@nestjs/common");
 const user_crud_service_1 = require("./user-crud.service");
+const swagger_1 = require("@nestjs/swagger");
 let UserCrudController = class UserCrudController {
     userCrudService;
     constructor(userCrudService) {
@@ -24,11 +25,13 @@ let UserCrudController = class UserCrudController {
 exports.UserCrudController = UserCrudController;
 __decorate([
     (0, common_1.Get)(),
+    (0, swagger_1.ApiOperation)({ summary: 'List all users' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], UserCrudController.prototype, "findAll", null);
 exports.UserCrudController = UserCrudController = __decorate([
+    (0, swagger_1.ApiTags)('users'),
     (0, common_1.Controller)('user-crud'),
     __metadata("design:paramtypes", [user_crud_service_1.UserCrudService])
 ], UserCrudController);

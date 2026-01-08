@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
 const user_crud_module_1 = require("./modules/user-crud/user-crud.module");
+const account_login_module_1 = require("./modules/account-login/account-login.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,6 +36,7 @@ exports.AppModule = AppModule = __decorate([
                 }),
             }),
             user_crud_module_1.UserCrudModule,
+            account_login_module_1.AccountLoginModule,
         ],
     })
 ], AppModule);

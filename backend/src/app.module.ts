@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserCrudModule } from './modules/user-crud/user-crud.module';
+import { AccountLoginModule } from './modules/account-login/account-login.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { UserCrudModule } from './modules/user-crud/user-crud.module';
       }),
     }),
 
-    UserCrudModule, // ✅ only your existing module
+    UserCrudModule,
+    AccountLoginModule, // ✅ Login authentication module
   ],
 })
 export class AppModule {}

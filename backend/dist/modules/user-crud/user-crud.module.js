@@ -18,7 +18,7 @@ exports.UserCrudModule = UserCrudModule;
 exports.UserCrudModule = UserCrudModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([users_1.User]),
+            typeorm_1.TypeOrmModule.forFeature([users_1.Users]),
         ],
         controllers: [user_crud_controller_1.UserCrudController],
         providers: [user_crud_service_1.UserCrudService],

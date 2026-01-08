@@ -29,7 +29,7 @@ let UserCrudService = class UserCrudService {
 exports.UserCrudService = UserCrudService;
 exports.UserCrudService = UserCrudService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(users_1.User)),
+    __param(0, (0, typeorm_1.InjectRepository)(users_1.Users)),
     __metadata("design:paramtypes", [typeorm_2.Repository])
 ], UserCrudService);
 //# sourceMappingURL=user-crud.service.js.map
