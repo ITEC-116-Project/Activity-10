@@ -43,7 +43,7 @@ const MyTickets = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkedInParticipants, setCheckedInParticipants] = useState(new Set());
   const [cameraActive, setCameraActive] = useState(false);
-  const [scannedAttendee, setScannedAttendee] = useState(null);
+  // Removed inline attendee card/modal per requirement
   const [lastScannedCode, setLastScannedCode] = useState(null);
   const [isScanningPaused, setIsScanningPaused] = useState(false);
   const videoRef = useRef(null);
@@ -222,8 +222,7 @@ const MyTickets = () => {
             timerProgressBar: true
           });
 
-          // Also show inline attendee card and wait for user to close it before resuming scan
-          setScannedAttendee(attendee);
+          // No inline card/modal; scanning resumes after alert closes
         }
       } else {
         console.log('No attendee found for QR code:', qrData);
@@ -540,79 +539,11 @@ const MyTickets = () => {
         )}
       </div>
 
-      {scannedAttendee && (
-        <AttendeeModal 
-          attendee={scannedAttendee} 
-          event={activeEvent} 
-          isCheckedIn={true} 
-          onClose={() => { setScannedAttendee(null); setIsScanningPaused(false); setLastScannedCode(null); }} 
-        />
-      )}
+      {/* Inline attendee card/modal removed; SweetAlert is the only feedback */}
     </div>
   );
 };
 
-const AttendeeModal = ({ attendee, event, isCheckedIn, onClose }) => {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div style={{ 
-          padding: '40px 30px', 
-          textAlign: 'center', 
-          background: 'linear-gradient(135deg, #d4f1e8 0%, #e8f9f5 100%)', 
-          borderRadius: '16px'
-        }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '40px 30px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
-            {/* Welcome + Ticket ID */}
-            <p style={{ margin: '0 0 12px 0', fontSize: '22px', fontWeight: '700', color: '#0f766e' }}>Welcome {attendee.userName}!</p>
-            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Ticket ID</p>
-            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666', fontFamily: 'monospace' }}>{attendee.ticketId}</p>
-
-            {/* Attendee Info */}
-            <p style={{ margin: '30px 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Attendee Name</p>
-            <p style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>{attendee.userName}</p>
-
-            <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Email</p>
-            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.email || '—'}</p>
-
-            {attendee.company && (
-              <>
-                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Company Name</p>
-                <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.company}</p>
-              </>
-            )}
-
-            {/* Check-in Status */}
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '15px', 
-              backgroundColor: '#d1fae5', 
-              borderRadius: '8px',
-              marginBottom: '20px'
-            }}>
-              <p style={{ 
-                margin: '0', 
-                fontSize: '16px', 
-                fontWeight: '700',
-                color: '#065f46'
-              }}>
-                ✓ Checked In
-              </p>
-            </div>
-
-            {/* OK Button */}
-            <button 
-              className="btn-primary" 
-              onClick={onClose}
-              style={{ width: '100%', padding: '12px', fontSize: '16px', marginTop: '20px' }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// AttendeeModal removed; use SweetAlert as the sole feedback mechanism
 
 export default MyTickets;
