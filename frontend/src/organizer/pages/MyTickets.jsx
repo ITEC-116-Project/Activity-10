@@ -353,7 +353,7 @@ const MyTickets = () => {
               </button>
             </div>
           ) : (
-            <button className="btn-primary" onClick={startCamera} style={{ flex: 1, padding: '10px', fontSize: '13px' }}>
+            <button className="btn-primary" onClick={startCamera} style={{ padding: '8px', fontSize: '13px' }}>
               📱 Start Camera
             </button>
           )}
