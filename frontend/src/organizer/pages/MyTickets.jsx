@@ -403,15 +403,15 @@ const MyTickets = () => {
           </div>
         </div>
 
-        {/* Right: Camera Feed */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* Right: Camera Feed and Attendee Info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={{
             border: '3px solid #0f766e',
             borderRadius: '12px',
             overflow: 'hidden',
             backgroundColor: '#000',
-            aspectRatio: '1',
-            maxHeight: '320px',
+            aspectRatio: '4/3',
+            maxHeight: '240px',
             position: 'relative'
           }}>
             <video
@@ -441,12 +441,82 @@ const MyTickets = () => {
                 backgroundColor: '#1a1a1a',
                 color: '#888'
               }}>
-                <div style={{ fontSize: '48px', marginBottom: '10px' }}>📷</div>
-                <p style={{ margin: '0', textAlign: 'center' }}>Camera feed will appear here</p>
+                <div style={{ fontSize: '36px', marginBottom: '8px' }}>📷</div>
+                <p style={{ margin: '0', textAlign: 'center', fontSize: '13px' }}>Camera feed will appear here</p>
               </div>
             )}
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} width={320} height={320} />
+          
+          {/* Scanned Attendee Info Card */}
+          {scannedAttendee && (
+            <div style={{
+              background: 'linear-gradient(135deg, #d4f1e8 0%, #e8f9f5 100%)',
+              borderRadius: '12px',
+              padding: '20px',
+              border: '2px solid #0f766e'
+            }}>
+              <div style={{ background: 'white', borderRadius: '10px', padding: '15px' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600', textAlign: 'center' }}>Event Name</p>
+                <p style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: '700', color: '#0f766e', textAlign: 'center' }}>{activeEvent.title}</p>
+
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600', textAlign: 'center' }}>Ticket ID</p>
+                <p style={{ margin: '0 0 15px 0', fontSize: '11px', color: '#666', fontFamily: 'monospace', textAlign: 'center' }}>{scannedAttendee.ticketId}</p>
+
+                <div style={{ 
+                  background: '#f3f4f6', 
+                  borderRadius: '8px', 
+                  padding: '15px', 
+                  margin: '15px 0',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '10px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>✓ QR Scanned</p>
+                </div>
+
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600', textAlign: 'center' }}>Attendee Name</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#1f2937', textAlign: 'center' }}>{scannedAttendee.userName}</p>
+
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600', textAlign: 'center' }}>Email</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666', textAlign: 'center' }}>{scannedAttendee.email || '—'}</p>
+
+                {scannedAttendee.company && (
+                  <>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600', textAlign: 'center' }}>Company Name</p>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#666', textAlign: 'center' }}>{scannedAttendee.company}</p>
+                  </>
+                )}
+
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '10px', 
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '6px'
+                }}>
+                  <p style={{ 
+                    margin: '0', 
+                    fontSize: '13px', 
+                    fontWeight: '700',
+                    color: '#92400e',
+                    textAlign: 'center'
+                  }}>
+                    Pending Check-in
+                  </p>
+                </div>
+
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    setScannedAttendee(null);
+                    setIsScanningPaused(false);
+                    setLastScannedCode(null);
+                  }}
+                  style={{ width: '100%', padding: '10px', fontSize: '14px', marginTop: '15px' }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
           
           {cameraActive ? (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -553,19 +623,6 @@ const MyTickets = () => {
           />
         )}
       </div>
-
-      {scannedAttendee && (
-        <AttendeeModal 
-          attendee={scannedAttendee} 
-          event={activeEvent} 
-          isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} 
-          onClose={() => {
-            setScannedAttendee(null);
-            setIsScanningPaused(false);
-            setLastScannedCode(null);
-          }} 
-        />
-      )}
     </div>
   );
 };
