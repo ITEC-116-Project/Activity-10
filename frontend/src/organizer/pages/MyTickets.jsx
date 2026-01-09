@@ -77,6 +77,7 @@ const MyTickets = () => {
 
   const startCamera = async () => {
     try {
+      console.log('Starting camera...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'user',
@@ -85,12 +86,16 @@ const MyTickets = () => {
         }
       });
       
+      console.log('Camera stream obtained, setting video element...');
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         // Ensure video is ready to play
         await new Promise(resolve => {
           videoRef.current.onloadedmetadata = () => {
+            console.log('Video metadata loaded, starting playback...');
             videoRef.current.play().then(() => {
+              console.log('Video playing, camera active, starting QR scan...');
               setCameraActive(true);
               startQRScanning();
               resolve();
@@ -118,19 +123,30 @@ const MyTickets = () => {
   const startQRScanning = () => {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     
+    console.log('QR Scanning started');
+    let scanCount = 0;
+    
     scanIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current) return;
+      scanCount++;
+      
+      if (!videoRef.current || !canvasRef.current) {
+        if (scanCount % 50 === 0) console.warn('Missing video or canvas ref');
+        return;
+      }
       
       try {
         if (!window.jsQR) {
-          console.warn('jsQR library not loaded yet');
+          if (scanCount === 1) console.warn('jsQR library not loaded yet');
           return;
         }
         
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
-        if (!ctx || videoRef.current.videoWidth === 0) return;
+        if (!ctx || videoRef.current.videoWidth === 0) {
+          if (scanCount % 50 === 0) console.warn('No context or video not ready');
+          return;
+        }
 
         canvas.width = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
