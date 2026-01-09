@@ -403,45 +403,43 @@ const MyTickets = () => {
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Time</p>
               <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{activeEvent.time}</p>
             </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</p>
-                <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{activeEvent.location}</p>
-              </div>
-              {/* Inline mini-cards beside Location */}
-              {(() => {
-                const active = checkedInParticipants.size;
-                const total = participants.length;
-                const inactive = Math.max(total - active, 0);
-                const avg = total ? Math.round((active / total) * 100) : 0;
-                const cardStyle = {
-                  background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)',
-                  color: 'white',
-                  borderRadius: '10px',
-                  padding: '10px 12px',
-                  minWidth: '140px'
-                };
-                const labelStyle = { margin: 0, fontSize: '11px', opacity: 0.9 };
-                const valueStyle = { margin: '3px 0 0 0', fontSize: '18px', fontWeight: 700 };
-                return (
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <div style={cardStyle}>
-                      <p style={labelStyle}>Active</p>
-                      <p style={valueStyle}>{active}</p>
-                    </div>
-                    <div style={cardStyle}>
-                      <p style={labelStyle}>Inactive</p>
-                      <p style={valueStyle}>{inactive}</p>
-                    </div>
-                    <div style={cardStyle}>
-                      <p style={labelStyle}>Avg. Active</p>
-                      <p style={valueStyle}>{avg}%</p>
-                    </div>
-                  </div>
-                );
-              })()}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</p>
+              <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{activeEvent.location}</p>
             </div>
           </div>
+          {/* Metrics row under Location - compact size */}
+          {(() => {
+            const active = checkedInParticipants.size;
+            const total = participants.length;
+            const inactive = Math.max(total - active, 0);
+            const avg = total ? Math.round((active / total) * 100) : 0;
+            const cardStyle = {
+              background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)',
+              color: 'white',
+              borderRadius: '10px',
+              padding: '8px 10px',
+              minWidth: '120px'
+            };
+            const labelStyle = { margin: 0, fontSize: '10px', opacity: 0.9 };
+            const valueStyle = { margin: '2px 0 0 0', fontSize: '16px', fontWeight: 700 };
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                <div style={cardStyle}>
+                  <p style={labelStyle}>Active</p>
+                  <p style={valueStyle}>{active}</p>
+                </div>
+                <div style={cardStyle}>
+                  <p style={labelStyle}>Inactive</p>
+                  <p style={valueStyle}>{inactive}</p>
+                </div>
+                <div style={cardStyle}>
+                  <p style={labelStyle}>Avg. Active</p>
+                  <p style={valueStyle}>{avg}%</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right: Camera Feed */}
