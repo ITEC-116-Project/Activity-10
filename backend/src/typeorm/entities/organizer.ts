@@ -23,11 +23,14 @@ export class Organizer {
   @Column({ default: 'organizer' })
   role: string;
 
-  @Column({ nullable: true })
-  companyName: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  companyName: string | null;
 
-  @Column({ nullable: true })
-  phone: string;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;

@@ -561,13 +561,37 @@
 .users-table th {
   background: #f9f9f9;
   font-weight: 600;
-  color: #666;
+  color: #000; /* make header text black */
+}
+
+.users-table th,
+.users-table td {
+  color: #000; /* ensure all table text is black */
 }
 
 .users-table td.empty-state {
   text-align: center;
   padding: 60px;
-  color: #999;
+  color: #000; /* empty state text in black */
+}
+
+/* Status badge styles */
+.status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.status.active {
+  background: #e6ffed; /* light green */
+  color: #0b792e; /* dark green */
+}
+
+.status.inactive {
+  background: #fff7db; /* light yellow */
+  color: #7a5b00; /* dark yellow/brown */
 }
 
 /* Organizers Grid */

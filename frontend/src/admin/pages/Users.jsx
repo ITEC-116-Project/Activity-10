@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
+import { manageAccountService } from '../../shared/services/manageAccountService';
 
 const Users = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -12,19 +14,48 @@ const Users = () => {
     role: 'attendees',
     phone: ''
   });
+  const [users, setUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Sample users data - replace with actual data
-  const allUsers = []; // This will be populated with actual user data
+  useEffect(() => {
+    const loadUsers = async () => {
+      setLoading(true);
+      try {
+        const data = await manageAccountService.listUsers();
+        setUsers(Array.isArray(data) ? data : []);
+      } catch (err) {
+        Swal.fire({ icon: 'error', title: 'Unable to load users', text: err.message || 'Please try again.' });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const totalPages = Math.ceil(allUsers.length / itemsPerPage);
+    loadUsers();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterRole]);
+
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return users.filter((u) => {
+      const matchesRole = filterRole === 'all' ? true : u.role === filterRole;
+      const matchesSearch = term
+        ? `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)
+        : true;
+      return matchesRole && matchesSearch;
+    });
+  }, [users, searchTerm, filterRole]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentUsers = allUsers.slice(startIndex, startIndex + itemsPerPage);
+  const currentUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleAddUser = () => {
-    // TODO: Implement user creation logic
-    console.log('Creating user:', newUser);
-    setShowAddModal(false);
-    // Reset form
+  const resetForm = () => {
     setNewUser({
       firstName: '',
       lastName: '',
@@ -32,6 +63,29 @@ const Users = () => {
       role: 'attendees',
       phone: ''
     });
+  };
+
+  const handleAddUser = async () => {
+    setSubmitting(true);
+    try {
+      const created = await manageAccountService.createUser({
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        role: newUser.role,
+        phone: newUser.phone || undefined,
+      });
+
+      setUsers((prev) => [created, ...prev]);
+      // Show a success notification but don't reveal the temporary password in the alert
+      Swal.fire({ icon: 'success', title: 'User added', text: 'User was created successfully.' });
+      setShowAddModal(false);
+      resetForm();
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Unable to add user', text: err.message || 'Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -42,11 +96,17 @@ const Users = () => {
       </div>
 
       <div className="search-bar">
-        <input type="text" placeholder="Search users..." />
-        <select>
-          <option>All Roles</option>
-          <option>Organizer</option>
-          <option>Attendee</option>
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+          <option value="all">All Roles</option>
+          <option value="organizer">Organizer</option>
+          <option value="attendees">Attendee</option>
+          <option value="admin">Admin</option>
         </select>
       </div>
 
@@ -62,16 +122,26 @@ const Users = () => {
             </tr>
           </thead>
           <tbody>
-            {currentUsers.length > 0 ? (
-              currentUsers.map(user => (
-                <tr key={user.id}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
-                  <td>{user.role}</td>
-                  <td>{user.status}</td>
-                  <td>{/* Action buttons */}</td>
-                </tr>
-              ))
+            {loading ? (
+              <tr>
+                <td colSpan="5" className="empty-state">Loading users...</td>
+              </tr>
+            ) : currentUsers.length > 0 ? (
+              currentUsers.map(user => {
+                const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+                const roleName = (r) => ({ attendees: 'Attendee', organizer: 'Organizer', admin: 'Admin' }[r] || capitalize(r));
+                const status = (user.status || (user.disabled || user.isActive === false ? 'inactive' : 'active')).toLowerCase();
+
+                return (
+                  <tr key={user.id}>
+                    <td>{`${capitalize(user.firstName || '')} ${capitalize(user.lastName || '')}`.trim()}</td>
+                    <td>{user.email}</td>
+                    <td>{roleName(user.role)}</td>
+                    <td><span className={`status ${status}`}>{capitalize(status)}</span></td>
+                    <td>{/* Action buttons */}</td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan="5" className="empty-state">No users found</td>
@@ -81,7 +151,7 @@ const Users = () => {
         </table>
       </div>
 
-      {allUsers.length > itemsPerPage && (
+      {filteredUsers.length > itemsPerPage && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -161,9 +231,9 @@ const Users = () => {
                 <button 
                   type="submit"
                   className="btn-primary" 
-                  disabled={!newUser.firstName || !newUser.lastName || !newUser.email}
+                  disabled={!newUser.firstName || !newUser.lastName || !newUser.email || submitting}
                 >
-                  Add User
+                  {submitting ? 'Adding...' : 'Add User'}
                 </button>
               </div>
             </form>

@@ -16,6 +16,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    console.log('App mounted');
     // Validate token on app load (page refresh)
     const validateTokenOnLoad = async () => {
       const token = localStorage.getItem("token");
@@ -32,6 +33,8 @@ function App() {
       }
       
       setIsInitializing(false);
+
+
     };
 
     validateTokenOnLoad();

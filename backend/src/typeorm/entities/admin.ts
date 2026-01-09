@@ -23,6 +23,9 @@ export class Admin {
   @Column({ default: 'admin' })
   role: string;
 
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 

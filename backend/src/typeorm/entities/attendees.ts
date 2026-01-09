@@ -23,11 +23,14 @@ export class Attendees {
   @Column({ default: 'attendees' })
   role: string;
 
-  @Column({ nullable: true })
-  phone: string;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone: string | null;
 
-  @Column({ nullable: true })
-  university: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  university: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;

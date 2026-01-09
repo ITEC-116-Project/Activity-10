@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserCrudModule } from './modules/user-crud/user-crud.module';
 import { AccountLoginModule } from './modules/account-login/account-login.module';
+import { ManageAccountModule } from './modules/manage-account/manage-account.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AccountLoginModule } from './modules/account-login/account-login.module
 
     UserCrudModule,
     AccountLoginModule, // ✅ Login authentication module
+    ManageAccountModule,
   ],
 })
 export class AppModule {}
