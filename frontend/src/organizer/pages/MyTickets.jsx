@@ -346,12 +346,16 @@ const MyTickets = () => {
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} width={320} height={320} />
           
-          {cameraActive && (
+          {cameraActive ? (
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn-secondary" onClick={stopCamera} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
                 Stop Camera
               </button>
             </div>
+          ) : (
+            <button className="btn-primary" onClick={startCamera} style={{ flex: 1, padding: '10px', fontSize: '13px' }}>
+              📱 Start Camera
+            </button>
           )}
         </div>
       </div>
