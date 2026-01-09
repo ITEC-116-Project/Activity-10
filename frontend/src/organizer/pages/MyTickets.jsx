@@ -17,6 +17,26 @@ const loadJsQR = () => {
 };
 
 const MyTickets = () => {
+  // Static attendee data for valid QR codes
+  const validAttendees = [
+    {
+      ticketId: 'TKT-1767891364803-Y39YSPS1O',
+      eventId: 1,
+      eventTitle: 'Tech Conference 2026',
+      userName: 'Rolly',
+      email: 'aeln@email.com',
+      company: 'TUBOL'
+    },
+    {
+      ticketId: 'TKT-1767893136483-Y39YSPS10',
+      eventId: 2,
+      eventTitle: 'Web Development Workshop',
+      userName: 'Marc Andrei',
+      email: 'marc@email.com',
+      company: 'Tech Corp'
+    }
+  ];
+
   const [activeEvent, setActiveEvent] = useState({
     id: 2,
     title: 'Web Development Workshop',
@@ -185,25 +205,29 @@ const MyTickets = () => {
     
     try {
       // Try to parse as JSON (the QR contains the full ticket object)
-      let attendee;
+      let scannedData;
       try {
-        attendee = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+        scannedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
       } catch {
-        // If not JSON, treat as plain ticketId
-        attendee = participants.find(p => p.ticketId === qrData);
+        // If not JSON, treat as plain string
+        scannedData = { ticketId: qrData };
       }
       
-      if (attendee && attendee.ticketId) {
-        console.log('Attendee found:', attendee);
+      // Check if this attendee is in our valid list
+      const validAttendee = validAttendees.find(a => a.ticketId === scannedData.ticketId);
+      
+      if (validAttendee) {
+        console.log('Valid attendee found:', validAttendee);
         
         if (lastScannedCode !== qrData) {
           setLastScannedCode(qrData);
+          setScannedAttendee(validAttendee); // Show modal for valid attendees
           
-          // Show success alert only (no modal)
+          // Also show success alert
           Swal.fire({
             icon: 'success',
             title: 'QR Code Detected!',
-            text: `Welcome ${attendee.userName}! ✓ Checked In`,
+            text: `Welcome ${validAttendee.userName}! ✓ Checked In`,
             confirmButtonColor: '#0f766e',
             confirmButtonText: 'OK',
             timer: 3000,
@@ -218,11 +242,11 @@ const MyTickets = () => {
           setIsScanningPaused(false);
         }
       } else {
-        console.log('No attendee found for QR code:', qrData);
+        console.log('Attendee not found for QR code:', qrData);
         Swal.fire({
           icon: 'error',
           title: 'Invalid QR Code',
-          text: 'This QR code is not recognized',
+          text: 'Attendee not found',
           confirmButtonColor: '#dc2626'
         }).then(() => {
           // Resume scanning after error alert
@@ -530,7 +554,18 @@ const MyTickets = () => {
         )}
       </div>
 
-      {scannedAttendee && <AttendeeModal attendee={scannedAttendee} event={activeEvent} isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} onClose={() => setScannedAttendee(null)} />}
+      {scannedAttendee && (
+        <AttendeeModal 
+          attendee={scannedAttendee} 
+          event={activeEvent} 
+          isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} 
+          onClose={() => {
+            setScannedAttendee(null);
+            setIsScanningPaused(false);
+            setLastScannedCode(null);
+          }} 
+        />
+      )}
     </div>
   );
 };
