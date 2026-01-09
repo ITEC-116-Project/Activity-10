@@ -58,7 +58,7 @@ const MyTickets = () => {
         videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       }
       if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
+        cancelAnimationFrame(scanIntervalRef.current);
       }
     };
   }, []);
@@ -121,22 +121,22 @@ const MyTickets = () => {
   };
 
   const startQRScanning = () => {
-    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    if (scanIntervalRef.current) {
+      cancelAnimationFrame(scanIntervalRef.current);
+    }
     
-    console.log('QR Scanning started');
-    let scanCount = 0;
+    console.log('QR Scanning started with requestAnimationFrame');
     
-    scanIntervalRef.current = setInterval(() => {
-      scanCount++;
-      
+    const scanFrame = () => {
       if (!videoRef.current || !canvasRef.current) {
-        if (scanCount % 50 === 0) console.warn('Missing video or canvas ref');
+        scanIntervalRef.current = requestAnimationFrame(scanFrame);
         return;
       }
       
       try {
         if (!window.jsQR) {
-          if (scanCount === 1) console.warn('jsQR library not loaded yet');
+          console.warn('jsQR library not loaded yet');
+          scanIntervalRef.current = requestAnimationFrame(scanFrame);
           return;
         }
         
@@ -144,7 +144,7 @@ const MyTickets = () => {
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
         if (!ctx || videoRef.current.videoWidth === 0) {
-          if (scanCount % 50 === 0) console.warn('No context or video not ready');
+          scanIntervalRef.current = requestAnimationFrame(scanFrame);
           return;
         }
 
@@ -163,7 +163,11 @@ const MyTickets = () => {
       } catch (error) {
         console.error('QR scanning error:', error);
       }
-    }, 100);
+      
+      scanIntervalRef.current = requestAnimationFrame(scanFrame);
+    };
+    
+    scanIntervalRef.current = requestAnimationFrame(scanFrame);
   };
 
   const handleQRScanned = (qrData) => {
@@ -203,6 +207,9 @@ const MyTickets = () => {
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       setCameraActive(false);
+    }
+    if (scanIntervalRef.current) {
+      cancelAnimationFrame(scanIntervalRef.current);
     }
   };
 
