@@ -222,6 +222,11 @@ const MyTickets = () => {
         if (lastScannedCode !== qrData) {
           setLastScannedCode(qrData);
           setScannedAttendee(validAttendee); // Show modal for valid attendees
+          // Auto mark checked-in if present in participants list
+          const matched = participants.find(p => p.ticketId === validAttendee.ticketId);
+          if (matched && !checkedInParticipants.has(matched.id)) {
+            setCheckedInParticipants(prev => new Set([...prev, matched.id]));
+          }
           
           // Also show success alert
           Swal.fire({
@@ -403,6 +408,29 @@ const MyTickets = () => {
               <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{activeEvent.location}</p>
             </div>
           </div>
+          {/* Small Cards: Active / Inactive / Avg Active */}
+          {(() => {
+            const active = checkedInParticipants.size;
+            const total = participants.length;
+            const inactive = Math.max(total - active, 0);
+            const avg = total ? Math.round((active / total) * 100) : 0;
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '14px' }}>
+                <div style={{ background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)', color: 'white', borderRadius: '10px', padding: '14px 16px' }}>
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.9 }}>Active Participants</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '22px', fontWeight: 700 }}>{active}</p>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)', color: 'white', borderRadius: '10px', padding: '14px 16px' }}>
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.9 }}>Inactive</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '22px', fontWeight: 700 }}>{inactive}</p>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)', color: 'white', borderRadius: '10px', padding: '14px 16px' }}>
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.9 }}>Avg. Active</p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '22px', fontWeight: 700 }}>{avg}%</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right: Camera Feed */}
