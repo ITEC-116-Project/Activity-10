@@ -171,35 +171,47 @@ const MyTickets = () => {
   };
 
   const handleQRScanned = (qrData) => {
-    console.log('Looking for participant with ticketId:', qrData);
-    console.log('Available participants:', participants.map(p => p.ticketId));
+    console.log('Raw QR data:', qrData);
     
-    const attendee = participants.find(p => p.ticketId === qrData);
-    
-    if (attendee) {
-      console.log('Attendee found:', attendee);
-      if (lastScannedCode !== qrData) {
-        setLastScannedCode(qrData);
-        setScannedAttendee(attendee);
+    try {
+      // Try to parse as JSON (the QR contains the full ticket object)
+      let attendee;
+      try {
+        attendee = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+      } catch {
+        // If not JSON, treat as plain ticketId
+        attendee = participants.find(p => p.ticketId === qrData);
+      }
+      
+      if (attendee && attendee.ticketId) {
+        console.log('Attendee found:', attendee);
         
-        // Auto check-in
-        if (!checkedInParticipants.has(attendee.id)) {
-          setCheckedInParticipants(prev => new Set([...prev, attendee.id]));
+        if (lastScannedCode !== qrData) {
+          setLastScannedCode(qrData);
+          setScannedAttendee(attendee);
+          
+          // Show success alert
+          Swal.fire({
+            icon: 'success',
+            title: 'QR Code Detected!',
+            text: `Welcome ${attendee.userName}! ✓ Checked In`,
+            confirmButtonColor: '#0f766e',
+            confirmButtonText: 'OK',
+            timer: 3000,
+            timerProgressBar: true
+          });
         }
-
-        // Show success alert
+      } else {
+        console.log('No attendee found for QR code:', qrData);
         Swal.fire({
-          icon: 'success',
-          title: 'QR Code Detected!',
-          text: `Welcome ${attendee.userName}! ✓ Checked In`,
-          confirmButtonColor: '#0f766e',
-          confirmButtonText: 'OK',
-          timer: 3000,
-          timerProgressBar: true
+          icon: 'error',
+          title: 'Invalid QR Code',
+          text: 'This QR code is not recognized',
+          confirmButtonColor: '#dc2626'
         });
       }
-    } else {
-      console.log('No attendee found for QR code:', qrData);
+    } catch (error) {
+      console.error('Error processing QR code:', error);
     }
   };
 
