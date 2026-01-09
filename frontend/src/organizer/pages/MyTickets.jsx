@@ -119,9 +119,14 @@ const MyTickets = () => {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     
     scanIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current || !window.jsQR) return;
+      if (!videoRef.current || !canvasRef.current) return;
       
       try {
+        if (!window.jsQR) {
+          console.warn('jsQR library not loaded yet');
+          return;
+        }
+        
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         
@@ -136,6 +141,7 @@ const MyTickets = () => {
         const code = window.jsQR(imageData.data, imageData.width, imageData.height);
         
         if (code && code.data) {
+          console.log('QR Code detected:', code.data);
           handleQRScanned(code.data);
         }
       } catch (error) {
@@ -145,27 +151,35 @@ const MyTickets = () => {
   };
 
   const handleQRScanned = (qrData) => {
+    console.log('Looking for participant with ticketId:', qrData);
+    console.log('Available participants:', participants.map(p => p.ticketId));
+    
     const attendee = participants.find(p => p.ticketId === qrData);
     
-    if (attendee && lastScannedCode !== qrData) {
-      setLastScannedCode(qrData);
-      setScannedAttendee(attendee);
-      
-      // Auto check-in
-      if (!checkedInParticipants.has(attendee.id)) {
-        setCheckedInParticipants(prev => new Set([...prev, attendee.id]));
-      }
+    if (attendee) {
+      console.log('Attendee found:', attendee);
+      if (lastScannedCode !== qrData) {
+        setLastScannedCode(qrData);
+        setScannedAttendee(attendee);
+        
+        // Auto check-in
+        if (!checkedInParticipants.has(attendee.id)) {
+          setCheckedInParticipants(prev => new Set([...prev, attendee.id]));
+        }
 
-      // Show success alert
-      Swal.fire({
-        icon: 'success',
-        title: 'QR Code Detected!',
-        text: `Welcome ${attendee.userName}! ✓ Checked In`,
-        confirmButtonColor: '#0f766e',
-        confirmButtonText: 'OK',
-        timer: 3000,
-        timerProgressBar: true
-      });
+        // Show success alert
+        Swal.fire({
+          icon: 'success',
+          title: 'QR Code Detected!',
+          text: `Welcome ${attendee.userName}! ✓ Checked In`,
+          confirmButtonColor: '#0f766e',
+          confirmButtonText: 'OK',
+          timer: 3000,
+          timerProgressBar: true
+        });
+      }
+    } else {
+      console.log('No attendee found for QR code:', qrData);
     }
   };
 
