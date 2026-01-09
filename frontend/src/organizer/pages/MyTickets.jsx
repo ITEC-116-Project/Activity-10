@@ -119,39 +119,36 @@ const MyTickets = () => {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     
     scanIntervalRef.current = setInterval(() => {
-      if (!videoRef.current || !canvasRef.current) return;
-      
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return;
-
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (!videoRef.current || !canvasRef.current || !window.jsQR) return;
       
       try {
-        if (!window.jsQR) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
         
+        if (!ctx || videoRef.current.videoWidth === 0) return;
+
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = window.jsQR(imageData.data, imageData.width, imageData.height);
         
-        if (code && code.data !== lastScannedCode) {
-          setLastScannedCode(code.data);
+        if (code && code.data) {
           handleQRScanned(code.data);
         }
       } catch (error) {
-        // Silent error handling for QR scanning
+        console.error('QR scanning error:', error);
       }
-    }, 200);
+    }, 100);
   };
 
   const handleQRScanned = (qrData) => {
     const attendee = participants.find(p => p.ticketId === qrData);
     
-    if (attendee) {
+    if (attendee && lastScannedCode !== qrData) {
+      setLastScannedCode(qrData);
       setScannedAttendee(attendee);
       // Auto check-in
       if (!checkedInParticipants.has(attendee.id)) {
