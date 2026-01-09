@@ -5,7 +5,7 @@ import Pagination from '../../components/Pagination';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-const Home = ({ onRedirectToEdit }) => {
+const Home = ({ onRedirectToEdit, onViewActiveEvent }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -60,10 +60,14 @@ const Home = ({ onRedirectToEdit }) => {
     return matchesSearch && matchesFilter;
   });
 
+  // Prioritize ongoing events to appear first (cards and table)
+  const statusRank = (s) => (s === 'ongoing' ? 0 : s === 'upcoming' ? 1 : s === 'past' ? 2 : 3);
+  const prioritizedEvents = filteredEvents.slice().sort((a, b) => statusRank(a.status) - statusRank(b.status));
+
   const itemsPerPage = viewMode === 'card' ? 5 : 10;
-  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+  const totalPages = Math.ceil(prioritizedEvents.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentEvents = filteredEvents.slice(startIndex, startIndex + itemsPerPage);
+  const currentEvents = prioritizedEvents.slice(startIndex, startIndex + itemsPerPage);
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
@@ -156,8 +160,14 @@ const Home = ({ onRedirectToEdit }) => {
                   </div>
                 </div>
                 <div className="event-actions">
-                  <button className="btn-secondary" onClick={() => setSelectedEvent(event)}>Participants</button>
-                  <button className="btn-secondary" onClick={() => onRedirectToEdit(event)}>Edit</button>
+                  {event.status === 'ongoing' ? (
+                    <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)}>View</button>
+                  ) : (
+                    <>
+                      <button className="btn-secondary" onClick={() => setSelectedEvent(event)}>Participants</button>
+                      <button className="btn-secondary" onClick={() => onRedirectToEdit(event)}>Edit</button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -201,8 +211,14 @@ const Home = ({ onRedirectToEdit }) => {
                     <td>{event.registered} / {event.capacity}</td>
                     <td><span className={`status-badge ${event.status}`}>{event.status}</span></td>
                     <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button className="btn-secondary" onClick={() => setSelectedEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>Participants</button>
-                      <button className="btn-secondary" onClick={() => onRedirectToEdit(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>Edit</button>
+                      {event.status === 'ongoing' ? (
+                        <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
+                      ) : (
+                        <>
+                          <button className="btn-secondary" onClick={() => setSelectedEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>Participants</button>
+                          <button className="btn-secondary" onClick={() => onRedirectToEdit(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>Edit</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))

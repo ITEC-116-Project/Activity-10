@@ -49,12 +49,22 @@ const OrganizerDashboard = () => {
     navigate('/login');
   };
 
+  const handleViewActiveEvent = (event) => {
+    try {
+      localStorage.setItem('activeEventId', String(event.id));
+      localStorage.setItem('activeEvent', JSON.stringify(event));
+    } catch {
+      /* ignore storage errors */
+    }
+    setActiveSection('mytickets');
+  };
+
   const renderContent = () => {
     switch(activeSection) {
       case 'home':
-        return <Home onRedirectToEdit={(event) => { setSelectedEventForEdit(event); setActiveSection('events'); }} />;
+        return <Home onRedirectToEdit={(event) => { setSelectedEventForEdit(event); setActiveSection('events'); }} onViewActiveEvent={handleViewActiveEvent} />;
       case 'events':
-        return <Events initialEventToEdit={selectedEventForEdit} onClearEditEvent={() => setSelectedEventForEdit(null)} />;
+        return <Events initialEventToEdit={selectedEventForEdit} onClearEditEvent={() => setSelectedEventForEdit(null)} onViewActiveEvent={handleViewActiveEvent} />;
       case 'mytickets':
         return <MyTickets />;
       case 'reports':

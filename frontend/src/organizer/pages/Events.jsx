@@ -5,7 +5,7 @@ import Pagination from '../../components/Pagination';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-const Events = ({ initialEventToEdit, onClearEditEvent }) => {
+const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -86,6 +86,15 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
     setCurrentPage(1);
   };
 
+  // Compute filtered and prioritized events so 'ongoing' appears first
+  const rankStatus = (s) => (s === 'ongoing' ? 0 : s === 'upcoming' ? 1 : s === 'past' ? 2 : 3);
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+    return matchesSearch && matchesFilter;
+  });
+  const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(a.status) - rankStatus(b.status));
+
   const handleDelete = (id) => {
     Swal.fire({
       icon: 'warning',
@@ -137,11 +146,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
       {viewMode === 'card' ? (
       <>
       <div className="events-grid">
-        {events.filter(event => {
-          const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
-          return matchesSearch && matchesFilter;
-        }).slice((currentPage - 1) * 5, currentPage * 5).map(event => (
+        {prioritizedEvents.slice((currentPage - 1) * 5, currentPage * 5).map(event => (
           <div key={event.id} className="event-card">
             <div className="event-header">
               <h4>{event.title}</h4>
@@ -154,27 +159,26 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
               <p><strong>Capacity:</strong> {event.registered} / {event.capacity}</p>
             </div>
             <div className="event-actions">
-              <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }}>Details</button>
-              <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }}>Edit</button>
-              <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+              {event.status === 'ongoing' ? (
+                <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)}>View</button>
+              ) : (
+                <>
+                  <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }}>Details</button>
+                  <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }}>Edit</button>
+                  <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+                </>
+              )}
             </div>
           </div>
         ))}
       </div>
-      {(() => {
-        const filtered = events.filter(event => {
-          const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
-          return matchesSearch && matchesFilter;
-        });
-        return filtered.length > 5 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filtered.length / 5)}
-            onPageChange={setCurrentPage}
-          />
-        );
-      })()}
+      {prioritizedEvents.length > 5 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(prioritizedEvents.length / 5)}
+          onPageChange={setCurrentPage}
+        />
+      )}
       </>
       ) : (
       <>
@@ -192,11 +196,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
             </tr>
           </thead>
           <tbody>
-            {events.filter(event => {
-              const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-              const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
-              return matchesSearch && matchesFilter;
-            }).slice((currentPage - 1) * 10, currentPage * 10).map(event => (
+            {prioritizedEvents.slice((currentPage - 1) * 10, currentPage * 10).map(event => (
               <tr key={event.id}>
                 <td>{event.title}</td>
                 <td>{new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
@@ -205,29 +205,28 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
                 <td>{event.registered} / {event.capacity}</td>
                 <td><span className={`status-badge ${event.status}`}>{event.status}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
-                  <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+                  {event.status === 'ongoing' ? (
+                    <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
+                  ) : (
+                    <>
+                      <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
+                      <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>Edit</button>
+                      <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {(() => {
-        const filtered = events.filter(event => {
-          const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
-          return matchesSearch && matchesFilter;
-        });
-        return filtered.length > 10 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filtered.length / 10)}
-            onPageChange={setCurrentPage}
-          />
-        );
-      })()}
+      {prioritizedEvents.length > 10 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(prioritizedEvents.length / 10)}
+          onPageChange={setCurrentPage}
+        />
+      )}
       </>
       )}
 

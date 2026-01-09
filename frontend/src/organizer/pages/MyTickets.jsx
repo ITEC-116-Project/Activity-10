@@ -37,16 +37,24 @@ const MyTickets = () => {
     }
   ];
 
-  const [activeEvent, setActiveEvent] = useState({
-    id: 2,
-    title: 'Web Development Workshop',
-    date: '2026-01-20',
-    time: '14:00 - 18:00',
-    location: 'BGC Innovation Hub',
-    capacity: 100,
-    registered: 87,
-    status: 'ongoing',
-    description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
+  const [activeEvent, setActiveEvent] = useState(() => {
+    try {
+      const stored = localStorage.getItem('activeEvent');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch { /* ignore */ }
+    return {
+      id: 2,
+      title: 'Web Development Workshop',
+      date: '2026-01-20',
+      time: '14:00 - 18:00',
+      location: 'BGC Innovation Hub',
+      capacity: 100,
+      registered: 87,
+      status: 'ongoing',
+      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
+    };
   });
 
   const [participants, setParticipants] = useState(() => {
@@ -58,6 +66,17 @@ const MyTickets = () => {
       return [];
     }
   });
+
+  useEffect(() => {
+    // Update participants list whenever activeEvent changes
+    try {
+      const raw = localStorage.getItem('myTickets');
+      const tickets = raw ? JSON.parse(raw) : [];
+      setParticipants(tickets.filter(t => t.eventId === activeEvent.id));
+    } catch {
+      setParticipants([]);
+    }
+  }, [activeEvent]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');

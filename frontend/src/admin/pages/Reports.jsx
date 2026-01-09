@@ -13,6 +13,7 @@ const Reports = () => {
       return '';
     }
   });
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const allEvents = [
     {
@@ -208,11 +209,18 @@ const Reports = () => {
                         {event.status}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => setSelectedEvent(event)}
+                        className="btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: '13px', minWidth: '90px' }}
+                      >
+                        Details
+                      </button>
                       <button
                         onClick={() => downloadAttendanceReport(event)}
                         className="btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '13px', minWidth: '90px' }}
+                        style={{ padding: '6px 12px', fontSize: '13px', minWidth: '110px' }}
                       >
                         Download PDF
                       </button>
@@ -235,6 +243,152 @@ const Reports = () => {
           <p>No completed events found</p>
         </div>
       )}
+
+      {selectedEvent && (
+        <EventDetailsModal
+          event={selectedEvent}
+          attendees={getEventAttendees(selectedEvent.id)}
+          onClose={() => setSelectedEvent(null)}
+          onDownload={() => downloadAttendanceReport(selectedEvent)}
+        />
+      )}
+    </div>
+  );
+};
+
+const EventDetailsModal = ({ event, attendees, onClose, onDownload }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredAttendees = attendees.filter(a =>
+    a.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.email && a.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    a.ticketId.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '1250px', width: '96vw' }}
+      >
+        <div className="modal-header">
+          <h2>{event.title}</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '10px 20px 20px' }}>
+          {/* Left: Event Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {event.description && (
+              <div style={{ padding: '14px', backgroundColor: '#f0f9f8', borderLeft: '4px solid #0f766e', borderRadius: '4px' }}>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.description}</p>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Status</p>
+                <span className={`status-badge ${event.status.toLowerCase()}`}>{event.status}</span>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Capacity</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.registered} / {event.capacity}</p>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Capacity Progress</p>
+                <div className="progress-bar" style={{ marginTop: '6px' }}>
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${(event.registered / event.capacity) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Organizer</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.organizerName || '—'}</p>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Email</p>
+                <p style={{ margin: 0, color: '#0f766e' }}>{event.organizerEmail || '—'}</p>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Date</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Time</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.time}</p>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Location</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.location}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Participants */}
+          <div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Search by name, email, or ticket ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ flex: 1, minWidth: '240px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
+              />
+              <button className="btn-secondary" onClick={onDownload} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>📄 PDF</button>
+            </div>
+            <div className="events-table-container">
+              <table className="events-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Ticket ID</th>
+                    <th>Registration Date</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAttendees.length > 0 ? (
+                    filteredAttendees.map(a => (
+                      <tr key={a.id}>
+                        <td><strong>{a.userName}</strong></td>
+                        <td>{a.email || '—'}</td>
+                        <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{a.ticketId}</td>
+                        <td>{new Date(a.registeredAt).toLocaleDateString('en-US')}</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46'
+                          }}>Active</span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No participants found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-actions" style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button className="btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 };
