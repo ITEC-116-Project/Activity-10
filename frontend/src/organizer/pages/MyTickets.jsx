@@ -45,6 +45,7 @@ const MyTickets = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [scannedAttendee, setScannedAttendee] = useState(null);
   const [lastScannedCode, setLastScannedCode] = useState(null);
+  const [isScanningPaused, setIsScanningPaused] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const scanIntervalRef = useRef(null);
@@ -133,6 +134,12 @@ const MyTickets = () => {
         return;
       }
       
+      // Skip scanning if modal is open
+      if (isScanningPaused) {
+        scanIntervalRef.current = requestAnimationFrame(scanFrame);
+        return;
+      }
+      
       try {
         if (!window.jsQR) {
           console.warn('jsQR library not loaded yet');
@@ -189,6 +196,7 @@ const MyTickets = () => {
         if (lastScannedCode !== qrData) {
           setLastScannedCode(qrData);
           setScannedAttendee(attendee);
+          setIsScanningPaused(true); // Pause scanning when modal opens
           
           // Show success alert
           Swal.fire({
@@ -199,6 +207,11 @@ const MyTickets = () => {
             confirmButtonText: 'OK',
             timer: 3000,
             timerProgressBar: true
+          }).then(() => {
+            // Resume scanning when alert is closed
+            setScannedAttendee(null);
+            setIsScanningPaused(false);
+            setLastScannedCode(null);
           });
         }
       } else {
@@ -208,10 +221,14 @@ const MyTickets = () => {
           title: 'Invalid QR Code',
           text: 'This QR code is not recognized',
           confirmButtonColor: '#dc2626'
+        }).then(() => {
+          // Resume scanning after error alert
+          setIsScanningPaused(false);
         });
       }
     } catch (error) {
       console.error('Error processing QR code:', error);
+      setIsScanningPaused(false);
     }
   };
 
