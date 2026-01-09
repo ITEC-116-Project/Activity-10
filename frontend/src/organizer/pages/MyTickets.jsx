@@ -180,6 +180,9 @@ const MyTickets = () => {
   const handleQRScanned = (qrData) => {
     console.log('Raw QR data:', qrData);
     
+    // Immediately pause scanning to prevent multiple detections
+    setIsScanningPaused(true);
+    
     try {
       // Try to parse as JSON (the QR contains the full ticket object)
       let attendee;
@@ -195,10 +198,8 @@ const MyTickets = () => {
         
         if (lastScannedCode !== qrData) {
           setLastScannedCode(qrData);
-          setScannedAttendee(attendee);
-          setIsScanningPaused(true); // Pause scanning when modal opens
           
-          // Show success alert
+          // Show success alert only (no modal)
           Swal.fire({
             icon: 'success',
             title: 'QR Code Detected!',
@@ -209,10 +210,12 @@ const MyTickets = () => {
             timerProgressBar: true
           }).then(() => {
             // Resume scanning when alert is closed
-            setScannedAttendee(null);
             setIsScanningPaused(false);
             setLastScannedCode(null);
           });
+        } else {
+          // Same code scanned again, just resume
+          setIsScanningPaused(false);
         }
       } else {
         console.log('No attendee found for QR code:', qrData);
