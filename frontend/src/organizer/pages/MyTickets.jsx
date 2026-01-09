@@ -150,10 +150,22 @@ const MyTickets = () => {
     if (attendee && lastScannedCode !== qrData) {
       setLastScannedCode(qrData);
       setScannedAttendee(attendee);
+      
       // Auto check-in
       if (!checkedInParticipants.has(attendee.id)) {
         setCheckedInParticipants(prev => new Set([...prev, attendee.id]));
       }
+
+      // Show success alert
+      Swal.fire({
+        icon: 'success',
+        title: 'QR Code Detected!',
+        text: `Welcome ${attendee.userName}! ✓ Checked In`,
+        confirmButtonColor: '#0f766e',
+        confirmButtonText: 'OK',
+        timer: 3000,
+        timerProgressBar: true
+      });
     }
   };
 
