@@ -17,6 +17,26 @@ const loadJsQR = () => {
 };
 
 const MyTickets = () => {
+  // Static attendee data for valid QR codes
+  const validAttendees = [
+    {
+      ticketId: 'TKT-1767891364803-Y39YSPS1O',
+      eventId: 1,
+      eventTitle: 'Tech Conference 2026',
+      userName: 'Rolly',
+      email: 'aeln@email.com',
+      company: 'TUBOL'
+    },
+    {
+      ticketId: 'TKT-1767893136483-Y39YSPS10',
+      eventId: 2,
+      eventTitle: 'Web Development Workshop',
+      userName: 'Marc Andrei',
+      email: 'marc@email.com',
+      company: 'Tech Corp'
+    }
+  ];
+
   const [activeEvent, setActiveEvent] = useState({
     id: 2,
     title: 'Web Development Workshop',
@@ -43,7 +63,7 @@ const MyTickets = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkedInParticipants, setCheckedInParticipants] = useState(new Set());
   const [cameraActive, setCameraActive] = useState(false);
-  // Removed inline attendee card/modal per requirement
+  const [scannedAttendee, setScannedAttendee] = useState(null);
   const [lastScannedCode, setLastScannedCode] = useState(null);
   const [isScanningPaused, setIsScanningPaused] = useState(false);
   const videoRef = useRef(null);
@@ -185,53 +205,50 @@ const MyTickets = () => {
     
     try {
       // Try to parse as JSON (the QR contains the full ticket object)
-      let attendee;
+      let scannedData;
       try {
-        attendee = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+        scannedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
       } catch {
-        // If not JSON, treat as plain ticketId
-        attendee = participants.find(p => p.ticketId === qrData);
+        // If not JSON, treat as plain string
+        scannedData = { ticketId: qrData };
       }
       
-      if (attendee && attendee.ticketId) {
-        console.log('Attendee found:', attendee);
+      // Check if this attendee is in our valid list
+      const validAttendee = validAttendees.find(a => a.ticketId === scannedData.ticketId);
+      
+      if (validAttendee) {
+        console.log('Valid attendee found:', validAttendee);
         
         if (lastScannedCode !== qrData) {
           setLastScannedCode(qrData);
-          // If this attendee exists in current participants, mark as checked-in
-          const match = participants.find(p => p.ticketId === attendee.ticketId);
-          if (match && match.id) {
-            setCheckedInParticipants(prev => new Set([...prev, match.id]));
-          }
-
-          // Show success alert with custom design; keep scanning paused until the inline card is dismissed
+          setScannedAttendee(validAttendee); // Show modal for valid attendees
+          
+          // Also show success alert
           Swal.fire({
             icon: 'success',
-            title: `Welcome ${attendee.userName}!`,
-            html: `
-              <div style="margin-top:10px;text-align:left;line-height:1.6;">
-                <div style="font-size:13px;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;font-weight:600;">Ticket ID</div>
-                <div style="font-family:monospace;font-size:14px;color:#0f766e;margin-bottom:10px;">${attendee.ticketId}</div>
-                <div style="font-size:13px;color:#6b7280;letter-spacing:.5px;text-transform:uppercase;font-weight:600;">Email</div>
-                <div style="font-size:14px;color:#374151;">${attendee.email || '—'}</div>
-              </div>
-            `,
+            title: 'QR Code Detected!',
+            text: `Welcome ${validAttendee.userName}! ✓ Checked In`,
             confirmButtonColor: '#0f766e',
             confirmButtonText: 'OK',
             timer: 3000,
             timerProgressBar: true
+          }).then(() => {
+            // Resume scanning when alert is closed
+            setIsScanningPaused(false);
+            setLastScannedCode(null);
           });
-
-          // No inline card/modal; scanning resumes after alert closes
+        } else {
+          // Same code scanned again, just resume
+          setIsScanningPaused(false);
         }
       } else {
-        console.log('No attendee found for QR code:', qrData);
+        console.log('Attendee not found for QR code:', qrData);
         Swal.fire({
           icon: 'error',
           title: 'Invalid QR Code',
-          text: 'This QR code is not recognized',
+          text: 'Attendee not found',
           confirmButtonColor: '#dc2626',
-          timer: 2000,
+          timer: 3000,
           timerProgressBar: true
         }).then(() => {
           // Resume scanning after error alert
@@ -539,11 +556,102 @@ const MyTickets = () => {
         )}
       </div>
 
-      {/* Inline attendee card/modal removed; SweetAlert is the only feedback */}
+      {scannedAttendee && (
+        <AttendeeModal 
+          attendee={scannedAttendee} 
+          event={activeEvent} 
+          isCheckedIn={checkedInParticipants.has(scannedAttendee.id)} 
+          onClose={() => {
+            setScannedAttendee(null);
+            setIsScanningPaused(false);
+            setLastScannedCode(null);
+          }} 
+        />
+      )}
     </div>
   );
 };
 
-// AttendeeModal removed; use SweetAlert as the sole feedback mechanism
+const AttendeeModal = ({ attendee, event, isCheckedIn, onClose }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div style={{ 
+          padding: '40px 30px', 
+          textAlign: 'center', 
+          background: 'linear-gradient(135deg, #d4f1e8 0%, #e8f9f5 100%)', 
+          borderRadius: '16px'
+        }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '40px 30px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+            {/* Event Name */}
+            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Event Name</p>
+            <p style={{ margin: '0 0 20px 0', fontSize: '22px', fontWeight: '700', color: '#0f766e' }}>{event.title}</p>
+
+            {/* Ticket ID */}
+            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Ticket ID</p>
+            <p style={{ margin: '0 0 30px 0', fontSize: '14px', color: '#666', fontFamily: 'monospace' }}>{attendee.ticketId}</p>
+
+            {/* QR Code Placeholder */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '30px 0' }}>
+              <div style={{ 
+                width: '200px', 
+                height: '200px', 
+                backgroundColor: '#f3f4f6', 
+                borderRadius: '12px', 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px dashed #d1d5db'
+              }}>
+                <p style={{ color: '#9ca3af', margin: 0 }}>✓ QR Scanned</p>
+              </div>
+            </div>
+
+            {/* Attendee Info */}
+            <p style={{ margin: '30px 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Attendee Name</p>
+            <p style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>{attendee.userName}</p>
+
+            <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Email</p>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.email || '—'}</p>
+
+            {attendee.company && (
+              <>
+                <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#888', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: '600' }}>Company Name</p>
+                <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#666' }}>{attendee.company}</p>
+              </>
+            )}
+
+            {/* Check-in Status */}
+            <div style={{ 
+              marginTop: '20px', 
+              padding: '15px', 
+              backgroundColor: isCheckedIn ? '#d1fae5' : '#fef3c7', 
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ 
+                margin: '0', 
+                fontSize: '16px', 
+                fontWeight: '700',
+                color: isCheckedIn ? '#065f46' : '#92400e'
+              }}>
+                {isCheckedIn ? '✓ Checked In' : 'Pending Check-in'}
+              </p>
+            </div>
+
+            {/* OK Button */}
+            <button 
+              className="btn-primary" 
+              onClick={onClose}
+              style={{ width: '100%', padding: '12px', fontSize: '16px', marginTop: '20px' }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default MyTickets;
