@@ -562,14 +562,19 @@
 }
 
 .users-table th {
-  background: #f9f9f9;
-  font-weight: 600;
-  color: #000; /* make header text black */
+  /* Use the same gradient header as reports/events */
+  background: linear-gradient(90deg, #0f766e, #0b5f58);
+  color: #fff; /* white header text */
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: left;
+  border-bottom: none;
 }
 
 .users-table th,
 .users-table td {
-  color: #000; /* ensure all table text is black */
+  color: #000; /* table body text remains black */
 }
 
 .users-table td.empty-state {

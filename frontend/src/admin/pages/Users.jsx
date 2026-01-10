@@ -205,8 +205,8 @@ const Users = () => {
         </select>
       </div>
 
-      <div className="users-table">
-        <table>
+      <div className="events-table-container users-table">
+        <table className="events-table">
           <thead>
             <tr>
               <th>Name</th>
