@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom';
+import { authService } from '../services/authService';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem('token');
-  const userRole = localStorage.getItem('userRole');
+  const token = authService.getToken();
+  const userRole = authService.getRole();
 
   if (!token) {
     return <Navigate to="/login" replace />;

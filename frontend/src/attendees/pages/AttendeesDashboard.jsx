@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../shared/services/authService';
 import '../styles/AttendeesDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import BrowseEvents from './BrowseEvents.jsx';
@@ -12,15 +13,15 @@ const AttendeesDashboard = () => {
   const [activeSection, setActiveSection] = useState('events');
 
   useEffect(() => {
-    const role = localStorage.getItem('userRole');
-    const token = localStorage.getItem('token');
+    const role = authService.getRole();
+    const token = authService.getToken();
     
     if (!token || role !== 'attendees') {
       navigate('/login');
       return;
     }
 
-    const storedName = localStorage.getItem('firstName') || 'Attendee';
+    const storedName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Attendee';
     setUserName(storedName);
 
     // Listen for profile navigation event
@@ -33,7 +34,7 @@ const AttendeesDashboard = () => {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    authService.logout();
     navigate('/login');
   };
 

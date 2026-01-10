@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../shared/services/authService';
 import '../../loginSignup/styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -9,7 +10,39 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(true); // keep logged in by default
   const navigate = useNavigate();
+
+  // If already have a token in localStorage or sessionStorage, validate and redirect
+  useEffect(() => {
+    const autoRedirect = async () => {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+      try {
+        await authService.validateToken();
+        const role = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
+        switch (role) {
+          case 'admin':
+            navigate('/admin/dashboard');
+            break;
+          case 'organizer':
+            navigate('/organizer/dashboard');
+            break;
+          case 'attendees':
+            navigate('/attendees/dashboard');
+            break;
+          default:
+            navigate('/');
+        }
+      } catch (err) {
+        // invalid token — make sure storage is cleaned
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+    };
+
+    autoRedirect();
+  }, [navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -36,13 +69,14 @@ const LoginPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token and user info
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.role);
-        localStorage.setItem('userId', data.userId);
-        localStorage.setItem('username', data.username);
-        localStorage.setItem('firstName', data.firstName);
-        localStorage.setItem('lastName', data.lastName);
+        // Store token and user info in chosen storage
+        const chosenStorage = remember ? localStorage : sessionStorage;
+        chosenStorage.setItem('token', data.token);
+        chosenStorage.setItem('userRole', data.role);
+        chosenStorage.setItem('userId', data.userId);
+        chosenStorage.setItem('username', data.username);
+        chosenStorage.setItem('firstName', data.firstName);
+        chosenStorage.setItem('lastName', data.lastName);
 
         // Navigate based on role
         switch (data.role) {
@@ -97,6 +131,15 @@ const LoginPage = () => {
               required
               placeholder="Enter your password"
             />
+          </div>
+          <div className="form-group remember-me">
+            <input
+              type="checkbox"
+              id="remember"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            <label htmlFor="remember">Remember me</label>
           </div>
           {error && <div className="error-message">{error}</div>}
           <button type="submit" className="login-button" disabled={loading}>

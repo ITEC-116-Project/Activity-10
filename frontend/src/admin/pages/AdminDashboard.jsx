@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../shared/services/authService';
 import '../styles/AdminDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import Home from './Home.jsx';
@@ -17,15 +18,15 @@ const AdminDashboard = () => {
   const [hasTicket, setHasTicket] = useState(false);
 
   useEffect(() => {
-    const role = localStorage.getItem('userRole');
-    const token = localStorage.getItem('token');
+    const role = authService.getRole();
+    const token = authService.getToken();
     
     if (!token || role !== 'admin') {
       navigate('/login');
       return;
     }
 
-    const storedName = localStorage.getItem('firstName') || 'Admin';
+    const storedName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Admin';
     setUserName(storedName);
     // Check if admin has any tickets stored locally
     const loadTickets = () => {
@@ -47,7 +48,7 @@ const AdminDashboard = () => {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    authService.logout();
     navigate('/login');
   };
 

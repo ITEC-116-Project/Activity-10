@@ -36,7 +36,7 @@ export const authService = {
   },
 
   async validateToken() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return null;
 
     const response = await fetch(`${API_URL}/account-login/validate`, {
@@ -46,7 +46,9 @@ export const authService = {
     });
 
     if (!response.ok) {
+      // clear both storages if token invalid
       localStorage.clear();
+      sessionStorage.clear();
       return null;
     }
 
@@ -55,17 +57,18 @@ export const authService = {
 
   logout() {
     localStorage.clear();
+    sessionStorage.clear();
   },
 
   getToken() {
-    return localStorage.getItem('token');
+    return localStorage.getItem('token') || sessionStorage.getItem('token');
   },
 
   getRole() {
-    return localStorage.getItem('userRole');
+    return localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem('token');
+    return !!(this.getToken());
   },
 };

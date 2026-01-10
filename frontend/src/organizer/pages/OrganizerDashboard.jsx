@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../../shared/services/authService';
 import '../styles/OrganizerDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import Home from './Home.jsx';
@@ -15,15 +16,15 @@ const OrganizerDashboard = () => {
   const [hasTicket, setHasTicket] = useState(false);
 
   useEffect(() => {
-    const role = localStorage.getItem('userRole');
-    const token = localStorage.getItem('token');
+    const role = authService.getRole();
+    const token = authService.getToken();
     
     if (!token || role !== 'organizer') {
       navigate('/login');
       return;
     }
 
-    const storedName = localStorage.getItem('firstName') || 'Organizer';
+    const storedName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Organizer';
     setUserName(storedName);
     // Check if organizer has any tickets stored locally
     const loadTickets = () => {
@@ -45,7 +46,7 @@ const OrganizerDashboard = () => {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    authService.logout();
     navigate('/login');
   };
 

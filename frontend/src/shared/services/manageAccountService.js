@@ -37,4 +37,13 @@ export const manageAccountService = {
     });
     return handleResponse(res);
   },
+
+  async updateUser(role, id, payload) {
+    const res = await fetch(`${API_URL}/manage-account/${role}/${id}`, {
+      method: 'PATCH',
+      headers: buildHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+  },
 };

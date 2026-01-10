@@ -17,15 +17,20 @@ const Users = () => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [actionLoadingIds, setActionLoadingIds] = useState([]);
 
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
       try {
         const data = await manageAccountService.listUsers();
-        setUsers(Array.isArray(data) ? data : []);
+        // Deduplicate users by role+email to avoid duplicated rows from backend or DB
+        const arr = Array.isArray(data) ? data : [];
+        const unique = [...new Map(arr.map(u => [`${u.role}:${(u.email || '').toLowerCase()}`, u])).values()];
+        setUsers(unique);
       } catch (err) {
         Swal.fire({ icon: 'error', title: 'Unable to load users', text: err.message || 'Please try again.' });
       } finally {
@@ -36,9 +41,80 @@ const Users = () => {
     loadUsers();
   }, []);
 
+  const setActionLoading = (id, loading) => {
+    setActionLoadingIds(prev => loading ? [...new Set([...prev, id])] : prev.filter(x => x !== id));
+  };
+
+  const handleToggleActive = async (user) => {
+    if (user.role === 'admin') {
+      Swal.fire({ icon: 'warning', title: 'Not allowed', text: 'Admin accounts cannot be deactivated.' });
+      return;
+    }
+
+    const isCurrentlyActive = user.isActive !== false;
+    const action = isCurrentlyActive ? 'Deactivate' : 'Activate';
+
+    const confirmation = await Swal.fire({
+      title: `${action} account?`,
+      text: `Are you sure you want to ${action.toLowerCase()} this account for ${user.email}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: action,
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!confirmation.isConfirmed) return;
+
+    setActionLoading(user.id, true);
+
+    try {
+      const updated = await manageAccountService.updateUser(user.role, user.id, { isActive: !isCurrentlyActive });
+
+      // Refresh the list from the server to ensure client state matches the backend
+      try {
+        const fresh = await manageAccountService.listUsers();
+        const arr = Array.isArray(fresh) ? fresh : [];
+        const unique = [...new Map(arr.map(u => [`${u.role}:${(u.email || '').toLowerCase()}`, u])).values()];
+        setUsers(unique);
+
+        // If the updated user is included in current filters, navigate to the page containing it so it stays visible
+        const term = searchTerm.toLowerCase();
+        const matches = unique.filter(u => {
+          const matchesRole = filterRole === 'all' ? true : u.role === filterRole;
+          const matchesSearch = term
+            ? `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)
+            : true;
+          const normalizeStatus = (usr) => (usr.status || (usr.disabled || usr.isActive === false ? 'inactive' : 'active')).toLowerCase();
+          const matchesStatus = filterStatus === 'all' ? true : normalizeStatus(u) === filterStatus;
+          return matchesRole && matchesSearch && matchesStatus;
+        });
+
+        const idx = matches.findIndex(u => u.id === updated.id);
+        if (idx >= 0) {
+          const page = Math.floor(idx / itemsPerPage) + 1;
+          setCurrentPage(page);
+        }
+      } catch (err) {
+        // Fallback to updating locally if reloading failed
+        setUsers(prev => {
+          const replaced = prev.map(u => (u.id === updated.id ? updated : u));
+          if (!replaced.some(u => u.id === updated.id)) replaced.unshift(updated);
+          const unique = [...new Map(replaced.map(u => [`${u.role}:${(u.email || '').toLowerCase()}`, u])).values()];
+          return unique;
+        });
+      }
+
+      Swal.fire({ icon: 'success', title: 'Success', text: `Account ${action.toLowerCase()}d successfully.` });
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Operation failed', text: err.message || 'Please try again.' });
+    } finally {
+      setActionLoading(user.id, false);
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterRole]);
+  }, [searchTerm, filterRole, filterStatus]);
 
   const filteredUsers = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -47,13 +123,25 @@ const Users = () => {
       const matchesSearch = term
         ? `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)
         : true;
-      return matchesRole && matchesSearch;
+
+      const normalizeStatus = (user) => (user.status || (user.disabled || user.isActive === false ? 'inactive' : 'active')).toLowerCase();
+      const matchesStatus = filterStatus === 'all' ? true : normalizeStatus(u) === filterStatus;
+
+      return matchesRole && matchesSearch && matchesStatus;
     });
-  }, [users, searchTerm, filterRole]);
+  }, [users, searchTerm, filterRole, filterStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+
+  // If the current page is out of range after filtering (e.g., toggling status reduces pages), clamp it
+  React.useEffect(() => {
+    const total = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+    if (currentPage > total) {
+      setCurrentPage(total);
+    }
+  }, [filteredUsers, currentPage, itemsPerPage]);
 
   const resetForm = () => {
     setNewUser({
@@ -76,7 +164,8 @@ const Users = () => {
         phone: newUser.phone || undefined,
       });
 
-      setUsers((prev) => [created, ...prev]);
+      // Prevent duplicates when adding (remove any existing user with same role+email)
+      setUsers((prev) => [created, ...prev.filter(u => !(u.role === created.role && (u.email || '').toLowerCase() === (created.email || '').toLowerCase()))]);
       // Show a success notification but don't reveal the temporary password in the alert
       Swal.fire({ icon: 'success', title: 'User added', text: 'User was created successfully.' });
       setShowAddModal(false);
@@ -108,6 +197,12 @@ const Users = () => {
           <option value="attendees">Attendee</option>
           <option value="admin">Admin</option>
         </select>
+
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ marginLeft: '8px' }}>
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
       <div className="users-table">
@@ -116,6 +211,7 @@ const Users = () => {
             <tr>
               <th>Name</th>
               <th>Email</th>
+              <th>Phone</th>
               <th>Role</th>
               <th>Status</th>
               <th>Actions</th>
@@ -124,7 +220,7 @@ const Users = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="5" className="empty-state">Loading users...</td>
+                <td colSpan="6" className="empty-state">Loading users...</td>
               </tr>
             ) : currentUsers.length > 0 ? (
               currentUsers.map(user => {
@@ -136,15 +232,28 @@ const Users = () => {
                   <tr key={user.id}>
                     <td>{`${capitalize(user.firstName || '')} ${capitalize(user.lastName || '')}`.trim()}</td>
                     <td>{user.email}</td>
+                    <td>{user.phone || '-'}</td>
                     <td>{roleName(user.role)}</td>
                     <td><span className={`status ${status}`}>{capitalize(status)}</span></td>
-                    <td>{/* Action buttons */}</td>
+                    <td>
+                      {user.role === 'admin' ? (
+                        <span>—</span>
+                      ) : (
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleToggleActive(user)}
+                          disabled={actionLoadingIds.includes(user.id)}
+                        >
+                          {actionLoadingIds.includes(user.id) ? 'Processing...' : (status === 'active' ? 'Deactivate' : 'Activate')}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan="5" className="empty-state">No users found</td>
+                <td colSpan="6" className="empty-state">No users found</td>
               </tr>
             )}
           </tbody>

@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { authService } from '../../shared/services/authService';
 
 const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,41 +23,50 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
     }
   });
   const [filterStatus, setFilterStatus] = useState('all');
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: 'Tech Conference 2026',
-      date: '2026-02-15',
-      time: '09:00 - 17:00',
-      location: 'Manila Convention Center',
-      capacity: 500,
-      registered: 234,
-      status: 'upcoming',
-      description: 'A full-day technology conference covering AI, cloud, and modern web development.'
-    },
-    {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'ongoing',
-      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
-    },
-    {
-      id: 3,
-      title: 'Business Seminar',
-      date: '2026-03-10',
-      time: '10:00 - 16:00',
-      location: 'Makati Business Center',
-      capacity: 200,
-      registered: 145,
-      status: 'upcoming',
-      description: 'Executive seminar on scaling operations, finance strategies, and leadership.'
-    }
-  ]);
+  const loadInitialEvents = () => {
+    try {
+      const raw = localStorage.getItem('events');
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore parse errors */ }
+
+    return [
+      {
+        id: 1,
+        title: 'Tech Conference 2026',
+        date: '2026-02-15',
+        time: '09:00 - 17:00',
+        location: 'Manila Convention Center',
+        capacity: 500,
+        registered: 234,
+        status: 'upcoming',
+        description: 'A full-day technology conference covering AI, cloud, and modern web development.'
+      },
+      {
+        id: 2,
+        title: 'Web Development Workshop',
+        date: '2026-01-20',
+        time: '14:00 - 18:00',
+        location: 'BGC Innovation Hub',
+        capacity: 100,
+        registered: 87,
+        status: 'ongoing',
+        description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
+      },
+      {
+        id: 3,
+        title: 'Business Seminar',
+        date: '2026-03-10',
+        time: '10:00 - 16:00',
+        location: 'Makati Business Center',
+        capacity: 200,
+        registered: 145,
+        status: 'upcoming',
+        description: 'Executive seminar on scaling operations, finance strategies, and leadership.'
+      }
+    ];
+  };
+
+  const [events, setEvents] = useState(loadInitialEvents());
 
   useEffect(() => {
     if (initialEventToEdit) {
@@ -88,12 +98,41 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
   // Compute filtered and prioritized events so 'ongoing' appears first
   const rankStatus = (s) => (s === 'ongoing' ? 0 : s === 'upcoming' ? 1 : s === 'past' ? 2 : 3);
-  const filteredEvents = events.filter(event => {
+
+  const deriveStatus = (event) => {
+    let startTime = event.startTime;
+    let endTime = event.endTime;
+    if (!startTime && event.time) {
+      const parts = event.time.split(' - ');
+      startTime = parts[0] || '';
+      endTime = parts[1] || '';
+    }
+    if (event.date && startTime && endTime) {
+      const start = new Date(`${event.date}T${startTime}`);
+      const end = new Date(`${event.date}T${endTime}`);
+      const now = new Date();
+      if (now < start) return 'upcoming';
+      if (now >= start && now <= end) return 'ongoing';
+      return 'past';
+    }
+    return event.status || 'upcoming';
+  };
+
+  // If the current user is an organizer, only show events they created
+  const currentRole = authService.getRole();
+  const currentUserId = localStorage.getItem('userId');
+  const visibleEvents = currentRole === 'organizer' && currentUserId
+    ? events.filter(e => String(e.createdBy) === String(currentUserId))
+    : events;
+
+  const filteredEvents = visibleEvents.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+    const derived = deriveStatus(event);
+    const matchesFilter = filterStatus === 'all' ? true : derived === filterStatus;
     return matchesSearch && matchesFilter;
   });
-  const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(a.status) - rankStatus(b.status));
+
+  const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(deriveStatus(a)) - rankStatus(deriveStatus(b)));
 
   const handleDelete = (id) => {
     Swal.fire({
@@ -106,7 +145,11 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       cancelButtonText: 'Cancel'
     }).then((result) => {
       if (result.isConfirmed) {
-        setEvents((prev) => prev.filter((event) => event.id !== id));
+        setEvents((prev) => {
+          const updated = prev.filter((event) => event.id !== id);
+          try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
+          return updated;
+        });
         Swal.fire({
           icon: 'success',
           title: 'Deleted!',
@@ -118,10 +161,41 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
     });
   };
 
+  const createEvent = (newEvent) => {
+    const timeStr = `${newEvent.startTime} - ${newEvent.endTime}`;
+    const startDt = new Date(`${newEvent.date}T${newEvent.startTime}`);
+    const endDt = new Date(`${newEvent.date}T${newEvent.endTime}`);
+    const now = new Date();
+    const status = now < startDt ? 'upcoming' : (now >= startDt && now <= endDt ? 'ongoing' : 'past');
+
+    const createdBy = localStorage.getItem('userId');
+    const organizerName = localStorage.getItem('firstName') || '';
+    const organizerEmail = localStorage.getItem('email') || '';
+
+    setEvents(prev => {
+      const id = prev.length ? Math.max(...prev.map(e => e.id)) + 1 : 1;
+      const toAdd = { id, createdBy, organizerName, organizerEmail, registered: 0, status, time: timeStr, ...newEvent, capacity: Number(newEvent.capacity) };
+      const updated = [toAdd, ...prev];
+      try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Event Created',
+      text: 'New event has been added successfully.',
+      confirmButtonColor: '#0f766e',
+      confirmButtonText: 'OK'
+    });
+  };
+
   return (
     <div className="section">
-      <div className="section-header" style={{ marginBottom: '0' }}>
+      <div className="section-header" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h2>Events Management</h2>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>+ Add New Event</button>
+        </div>
       </div>
 
       <div className="search-bar">
@@ -143,14 +217,31 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
         </select>
       </div>
 
-      {viewMode === 'card' ? (
+      {authService.getRole() === 'organizer' && (
+        <div style={{ margin: '12px 0 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#065f46', borderRadius: 6 }}>
+          Showing events created by <strong>{localStorage.getItem('firstName') || 'you'}</strong> only. Use <strong>+ Add New Event</strong> to create more.
+        </div>
+      )}
+
+      {prioritizedEvents.length === 0 ? (
+        <div style={{ padding: '30px', textAlign: 'center', color: '#6b7280' }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>No events found.</p>
+          {authService.getRole() === 'organizer' ? (
+            <p style={{ marginBottom: '12px' }}>You haven't created any events yet. Click <strong>+ Add New Event</strong> to create one.</p>
+          ) : (
+            <p style={{ marginBottom: '12px' }}>No events match your filters.</p>
+          )}
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>+ Add New Event</button>
+        </div>
+      ) : (
+      (viewMode === 'card') ? (
       <>
       <div className="events-grid">
         {prioritizedEvents.slice((currentPage - 1) * 5, currentPage * 5).map(event => (
           <div key={event.id} className="event-card">
             <div className="event-header">
               <h4>{event.title}</h4>
-              <span className={`status-badge ${event.status}`}>{event.status}</span>
+              <span className={`status-badge ${deriveStatus(event)}`}>{deriveStatus(event)}</span>
             </div>
             <div className="event-details">
               <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -159,7 +250,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
               <p><strong>Capacity:</strong> {event.registered} / {event.capacity}</p>
             </div>
             <div className="event-actions">
-              {event.status === 'ongoing' ? (
+              {deriveStatus(event) === 'ongoing' ? (
                 <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)}>View</button>
               ) : (
                 <>
@@ -203,9 +294,9 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
                 <td>{event.time}</td>
                 <td>{event.location}</td>
                 <td>{event.registered} / {event.capacity}</td>
-                <td><span className={`status-badge ${event.status}`}>{event.status}</span></td>
+                <td><span className={`status-badge ${deriveStatus(event)}`}>{deriveStatus(event)}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  {event.status === 'ongoing' ? (
+                  {deriveStatus(event) === 'ongoing' ? (
                     <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
                   ) : (
                     <>
@@ -228,10 +319,11 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
         />
       )}
       </>
+      )
       )}
 
       {showDetailsModal && selectedEvent && (
-        <EventDetailsModal event={selectedEvent} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
+        <EventDetailsModal event={selectedEvent} computedStatus={deriveStatus(selectedEvent)} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
       )}
       {showEditModal && editEventData && (
         <EditEventModal event={editEventData} onClose={() => { setShowEditModal(false); setEditEventData(null); }} />
@@ -239,6 +331,149 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       {showParticipantsModal && selectedEvent && (
         <ParticipantsModal event={selectedEvent} onClose={() => { setShowParticipantsModal(false); setSelectedEvent(null); }} />
       )}
+      {showCreateModal && (
+        <CreateEventModal onClose={() => setShowCreateModal(false)} onCreate={(data) => { createEvent(data); setShowCreateModal(false); }} />
+      )}
+    </div>
+  );
+};
+
+const CreateEventModal = ({ onClose, onCreate }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    location: '',
+    capacity: '',
+    category: ''
+  });
+
+  const minDate = new Date().toISOString().split('T')[0];
+  const nowTime = new Date().toTimeString().slice(0,5);
+  const addOneMinute = (timeStr) => {
+    if (!timeStr) return undefined;
+    const [h, m] = timeStr.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m + 1, 0, 0);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Basic validation
+    if (!formData.title || !formData.date || !formData.startTime || !formData.endTime || !formData.location || !formData.capacity) {
+      Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Please fill in all required fields.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    if (Number(formData.capacity) <= 0) {
+      Swal.fire({ icon: 'warning', title: 'Invalid capacity', text: 'Capacity must be a positive number.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    const start = new Date(`${formData.date}T${formData.startTime}`);
+    const end = new Date(`${formData.date}T${formData.endTime}`);
+    if (end <= start) {
+      Swal.fire({ icon: 'warning', title: 'Invalid time range', text: 'End time must be after start time.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    onCreate({ ...formData, capacity: Number(formData.capacity) });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Create Event</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Event Title *</label>
+            <input
+              type="text"
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label>Description *</label>
+            <textarea
+              required
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows="4"
+            />
+          </div>
+          <div className="form-row" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: '1 1 220px' }}>
+              <label>Date *</label>
+              <input
+                type="date"
+                required
+                min={minDate}
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              />
+            </div>
+            <div className="form-group" style={{ flex: '0 0 140px' }}>
+              <label>Start Time *</label>
+              <input
+                type="time"
+                required
+                disabled={!formData.date}
+                min={formData.date === minDate ? nowTime : undefined}
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+              />
+            </div>
+            <div className="form-group" style={{ flex: '0 0 140px' }}>
+              <label>End Time *</label>
+              <input
+                type="time"
+                required
+                disabled={!formData.date}
+                min={formData.startTime ? addOneMinute(formData.startTime) : (formData.date === minDate ? nowTime : undefined)}
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Location *</label>
+            <input
+              type="text"
+              required
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            />
+          </div>
+          <div className="form-row" style={{ alignItems: 'flex-end' }}>
+            <div className="form-group" style={{ flex: '1 1 240px' }}>
+              <label>Capacity *</label>
+              <input
+                type="number"
+                required
+                min={1}
+                step={1}
+                value={formData.capacity}
+                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary">Create Event</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
@@ -362,7 +597,7 @@ const EditEventModal = ({ event, onClose }) => {
   );
 };
 
-const EventDetailsModal = ({ event, onClose, onShowParticipants }) => {
+const EventDetailsModal = ({ event, computedStatus, onClose, onShowParticipants }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -379,7 +614,7 @@ const EventDetailsModal = ({ event, onClose, onShowParticipants }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
             <div>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}><span className={`status-badge ${event.status}`}>{event.status}</span></p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}><span className={`status-badge ${computedStatus || event.status}`}>{computedStatus || event.status}</span></p>
             </div>
             <div>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity</p>

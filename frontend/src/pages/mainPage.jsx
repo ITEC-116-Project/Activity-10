@@ -1,15 +1,16 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { authService } from '../shared/services/authService';
 import "../style/mainPage.css";
 
 function MainPage() {
   const navigate = useNavigate();
-  const isAuthenticated = localStorage.getItem("token");
+  const isAuthenticated = authService.getToken();
 
   useEffect(() => {
     // If user is already logged in, redirect to dashboard
     if (isAuthenticated) {
-      const userRole = localStorage.getItem("userRole");
+      const userRole = authService.getRole();
       const delayRedirect = setTimeout(() => {
         switch (userRole) {
           case "admin":

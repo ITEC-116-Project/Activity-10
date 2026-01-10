@@ -23,11 +23,19 @@ function App() {
       
       if (token) {
         try {
-          await authService.validateToken();
-          setIsAuthenticated(true);
+          const valid = await authService.validateToken();
+          if (!valid) {
+            // Token is invalid, clear storages
+            localStorage.clear();
+            sessionStorage.clear();
+            setIsAuthenticated(false);
+          } else {
+            setIsAuthenticated(true);
+          }
         } catch (error) {
-          // Token is invalid, clear localStorage
+          // unexpected error
           localStorage.clear();
+          sessionStorage.clear();
           setIsAuthenticated(false);
         }
       }

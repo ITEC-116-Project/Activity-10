@@ -92,7 +92,8 @@ const MyTickets = () => {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    loadJsQR().then(() => startCamera());
+    // Preload jsQR library but do NOT start camera automatically.
+    loadJsQR();
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach(track => track.stop());
@@ -117,6 +118,9 @@ const MyTickets = () => {
 
   const startCamera = async () => {
     try {
+      // Ensure jsQR is available before starting camera
+      await loadJsQR();
+
       console.log('Starting camera...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 

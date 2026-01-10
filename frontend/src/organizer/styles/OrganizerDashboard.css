@@ -244,8 +244,11 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
 }
 
-.events-table thead th {
+.events-table thead {
   background: linear-gradient(90deg, #0f766e, #0b5f58);
+}
+.events-table thead th {
+  background: transparent;
   color: #fff;
   padding: 12px 14px;
   font-weight: 700;
