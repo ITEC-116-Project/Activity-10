@@ -54,6 +54,6 @@ __decorate([
     __metadata("design:type", String)
 ], Users.prototype, "role", void 0);
 exports.Users = Users = __decorate([
-    (0, typeorm_1.Entity)({ name: 'users' })
+    (0, typeorm_1.Entity)({ name: 'users_ten' })
 ], Users);
 //# sourceMappingURL=users.js.map
