@@ -255,6 +255,10 @@
   background: #f3f4f6;
   color: #6b7280;
 }
+.status-badge.completed {
+  background: #f3f4f6;
+  color: #6b7280;
+}
 
 .event-details {
   margin-bottom: 15px;

@@ -13,6 +13,7 @@ const typeorm_1 = require("@nestjs/typeorm");
 const user_crud_module_1 = require("./modules/user-crud/user-crud.module");
 const account_login_module_1 = require("./modules/account-login/account-login.module");
 const manage_account_module_1 = require("./modules/manage-account/manage-account.module");
+const event_module_1 = require("./modules/event/event.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -39,6 +40,7 @@ exports.AppModule = AppModule = __decorate([
             user_crud_module_1.UserCrudModule,
             account_login_module_1.AccountLoginModule,
             manage_account_module_1.ManageAccountModule,
+            event_module_1.EventModule,
         ],
     })
 ], AppModule);

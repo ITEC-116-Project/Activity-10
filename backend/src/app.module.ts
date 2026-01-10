@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserCrudModule } from './modules/user-crud/user-crud.module';
 import { AccountLoginModule } from './modules/account-login/account-login.module';
 import { ManageAccountModule } from './modules/manage-account/manage-account.module';
+import { EventModule } from './modules/event/event.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ManageAccountModule } from './modules/manage-account/manage-account.mod
     UserCrudModule,
     AccountLoginModule, // ✅ Login authentication module
     ManageAccountModule,
+    EventModule,
   ],
 })
 export class AppModule {}

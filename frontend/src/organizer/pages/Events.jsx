@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { MdDelete, MdFileDownload } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
+import EventDetailsModal from '../components/EventDetailsModal';
+import { deriveStatusKey, displayStatusLabel } from '../../shared/utils/eventStatus';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import CreateEventModal from '../components/CreateEventModal';
 import { authService } from '../../shared/services/authService';
 
 const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => {
@@ -76,6 +79,41 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
     }
   }, [initialEventToEdit, onClearEditEvent]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      const updated = e.detail;
+      if (!updated) return;
+      setEvents(prev => prev.map(ev => String(ev.id) === String(updated.id) ? updated : ev));
+    };
+    window.addEventListener('event:updated', handler);
+    return () => window.removeEventListener('event:updated', handler);
+  }, []);
+
+  // Load events created by the currently logged-in user so this page shows that user's events
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    const loadByCreator = () => {
+      fetch(`${base}/events/by-creator/${userId}`)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(await res.text());
+          return res.json();
+        })
+        .then((data) => {
+          if (Array.isArray(data)) setEvents(data);
+        })
+        .catch((err) => {
+          console.error('Failed to load events by creator', err);
+        });
+    };
+
+    loadByCreator();
+    const poll = setInterval(loadByCreator, 60_000);
+    return () => clearInterval(poll);
+  }, []);
+
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
@@ -97,42 +135,23 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
   };
 
   // Compute filtered and prioritized events so 'ongoing' appears first
-  const rankStatus = (s) => (s === 'ongoing' ? 0 : s === 'upcoming' ? 1 : s === 'past' ? 2 : 3);
+  const rankStatus = (s) => (s === 'ongoing' ? 0 : s === 'upcoming' ? 1 : (s === 'past' || s === 'completed') ? 2 : 3);
 
-  const deriveStatus = (event) => {
-    let startTime = event.startTime;
-    let endTime = event.endTime;
-    if (!startTime && event.time) {
-      const parts = event.time.split(' - ');
-      startTime = parts[0] || '';
-      endTime = parts[1] || '';
-    }
-    if (event.date && startTime && endTime) {
-      const start = new Date(`${event.date}T${startTime}`);
-      const end = new Date(`${event.date}T${endTime}`);
-      const now = new Date();
-      if (now < start) return 'upcoming';
-      if (now >= start && now <= end) return 'ongoing';
-      return 'past';
-    }
-    return event.status || 'upcoming';
-  };
+  // deriveStatusKey and displayStatusLabel are provided by shared utils
 
-  // If the current user is an organizer, only show events they created
+  // Show events created by the currently logged-in user (if any)
   const currentRole = authService.getRole();
   const currentUserId = localStorage.getItem('userId');
-  const visibleEvents = currentRole === 'organizer' && currentUserId
-    ? events.filter(e => String(e.createdBy) === String(currentUserId))
-    : events;
+  const visibleEvents = currentUserId ? events.filter(e => String(e.createdBy) === String(currentUserId)) : events;
 
   const filteredEvents = visibleEvents.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const derived = deriveStatus(event);
+    const derived = deriveStatusKey(event);
     const matchesFilter = filterStatus === 'all' ? true : derived === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
-  const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(deriveStatus(a)) - rankStatus(deriveStatus(b)));
+  const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(deriveStatusKey(a)) - rankStatus(deriveStatusKey(b)));
 
   const handleDelete = (id) => {
     Swal.fire({
@@ -162,31 +181,51 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
   };
 
   const createEvent = (newEvent) => {
-    const timeStr = `${newEvent.startTime} - ${newEvent.endTime}`;
-    const startDt = new Date(`${newEvent.date}T${newEvent.startTime}`);
-    const endDt = new Date(`${newEvent.date}T${newEvent.endTime}`);
-    const now = new Date();
-    const status = now < startDt ? 'upcoming' : (now >= startDt && now <= endDt ? 'ongoing' : 'past');
+    // Fallback local creation (keeps previous behavior) if API not available
+    (async () => {
+      try {
+        const start = new Date(`${newEvent.date}T${newEvent.startTime}`);
+        const end = new Date(`${newEvent.date}T${newEvent.endTime}`);
+        const payload = {
+          title: newEvent.title,
+          date: start.toISOString(),
+          endDate: end.toISOString(),
+          time: `${newEvent.startTime} - ${newEvent.endTime}`,
+          location: newEvent.location,
+          capacity: Number(newEvent.capacity) || 0,
+          registered: 0,
+          status: (new Date() < start) ? 'upcoming' : ((new Date() >= start && new Date() <= end) ? 'ongoing' : 'completed'),
+          description: newEvent.description || '',
+          createdBy: localStorage.getItem('userId') || '1',
+          createdByName: localStorage.getItem('firstName') || ''
+        };
 
-    const createdBy = localStorage.getItem('userId');
-    const organizerName = localStorage.getItem('firstName') || '';
-    const organizerEmail = localStorage.getItem('email') || '';
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || 'Failed to create event on server');
+        }
+        const created = await res.json();
 
-    setEvents(prev => {
-      const id = prev.length ? Math.max(...prev.map(e => e.id)) + 1 : 1;
-      const toAdd = { id, createdBy, organizerName, organizerEmail, registered: 0, status, time: timeStr, ...newEvent, capacity: Number(newEvent.capacity) };
-      const updated = [toAdd, ...prev];
-      try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
-      return updated;
-    });
+        // Add to local list shown on this page
+        setEvents(prev => {
+          const updated = [created, ...prev];
+          try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
+          return updated;
+        });
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Event Created',
-      text: 'New event has been added successfully.',
-      confirmButtonColor: '#0f766e',
-      confirmButtonText: 'OK'
-    });
+        // Notify other pages (Home.jsx) to update immediately
+        try {
+          window.dispatchEvent(new CustomEvent('event:created', { detail: created }));
+        } catch {}
+
+        Swal.fire({ icon: 'success', title: 'Event Created', text: 'New event has been added successfully.', confirmButtonColor: '#0f766e', confirmButtonText: 'OK' });
+      } catch (err) {
+        console.error('Create event error', err);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not create event. Please try again.', confirmButtonColor: '#ef4444' });
+      }
+    })();
   };
 
   return (
@@ -241,7 +280,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           <div key={event.id} className="event-card">
             <div className="event-header">
               <h4>{event.title}</h4>
-              <span className={`status-badge ${deriveStatus(event)}`}>{deriveStatus(event)}</span>
+              <span className={`status-badge ${deriveStatusKey(event)}`}>{displayStatusLabel(event)}</span>
             </div>
             <div className="event-details">
               <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -250,7 +289,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
               <p><strong>Capacity:</strong> {event.registered} / {event.capacity}</p>
             </div>
             <div className="event-actions">
-              {deriveStatus(event) === 'ongoing' ? (
+              {deriveStatusKey(event) === 'ongoing' ? (
                 <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)}>View</button>
               ) : (
                 <>
@@ -294,9 +333,9 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
                 <td>{event.time}</td>
                 <td>{event.location}</td>
                 <td>{event.registered} / {event.capacity}</td>
-                <td><span className={`status-badge ${deriveStatus(event)}`}>{deriveStatus(event)}</span></td>
+                <td><span className={`status-badge ${deriveStatusKey(event)}`}>{displayStatusLabel(event)}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  {deriveStatus(event) === 'ongoing' ? (
+                  {deriveStatusKey(event) === 'ongoing' ? (
                     <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
                   ) : (
                     <>
@@ -323,7 +362,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       )}
 
       {showDetailsModal && selectedEvent && (
-        <EventDetailsModal event={selectedEvent} computedStatus={deriveStatus(selectedEvent)} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
+        <EventDetailsModal event={selectedEvent} computedStatus={displayStatusLabel(selectedEvent)} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
       )}
       {showEditModal && editEventData && (
         <EditEventModal event={editEventData} onClose={() => { setShowEditModal(false); setEditEventData(null); }} />
@@ -331,152 +370,12 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       {showParticipantsModal && selectedEvent && (
         <ParticipantsModal event={selectedEvent} onClose={() => { setShowParticipantsModal(false); setSelectedEvent(null); }} />
       )}
-      {showCreateModal && (
-        <CreateEventModal onClose={() => setShowCreateModal(false)} onCreate={(data) => { createEvent(data); setShowCreateModal(false); }} />
-      )}
-    </div>
-  );
-};
-
-const CreateEventModal = ({ onClose, onCreate }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    date: '',
-    startTime: '',
-    endTime: '',
-    location: '',
-    capacity: '',
-    category: ''
-  });
-
-  const minDate = new Date().toISOString().split('T')[0];
-  const nowTime = new Date().toTimeString().slice(0,5);
-  const addOneMinute = (timeStr) => {
-    if (!timeStr) return undefined;
-    const [h, m] = timeStr.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m + 1, 0, 0);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Basic validation
-    if (!formData.title || !formData.date || !formData.startTime || !formData.endTime || !formData.location || !formData.capacity) {
-      Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Please fill in all required fields.', confirmButtonColor: '#0f766e' });
-      return;
-    }
-
-    if (Number(formData.capacity) <= 0) {
-      Swal.fire({ icon: 'warning', title: 'Invalid capacity', text: 'Capacity must be a positive number.', confirmButtonColor: '#0f766e' });
-      return;
-    }
-
-    const start = new Date(`${formData.date}T${formData.startTime}`);
-    const end = new Date(`${formData.date}T${formData.endTime}`);
-    if (end <= start) {
-      Swal.fire({ icon: 'warning', title: 'Invalid time range', text: 'End time must be after start time.', confirmButtonColor: '#0f766e' });
-      return;
-    }
-
-    onCreate({ ...formData, capacity: Number(formData.capacity) });
-    onClose();
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Create Event</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+          {showCreateModal && (
+            <CreateEventModal onClose={() => setShowCreateModal(false)} onCreate={(data) => { createEvent(data); setShowCreateModal(false); }} />
+          )}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Event Title *</label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>Description *</label>
-            <textarea
-              required
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows="4"
-            />
-          </div>
-          <div className="form-row" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ flex: '1 1 220px' }}>
-              <label>Date *</label>
-              <input
-                type="date"
-                required
-                min={minDate}
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="form-group" style={{ flex: '0 0 140px' }}>
-              <label>Start Time *</label>
-              <input
-                type="time"
-                required
-                disabled={!formData.date}
-                min={formData.date === minDate ? nowTime : undefined}
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-              />
-            </div>
-            <div className="form-group" style={{ flex: '0 0 140px' }}>
-              <label>End Time *</label>
-              <input
-                type="time"
-                required
-                disabled={!formData.date}
-                min={formData.startTime ? addOneMinute(formData.startTime) : (formData.date === minDate ? nowTime : undefined)}
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Location *</label>
-            <input
-              type="text"
-              required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            />
-          </div>
-          <div className="form-row" style={{ alignItems: 'flex-end' }}>
-            <div className="form-group" style={{ flex: '1 1 240px' }}>
-              <label>Capacity *</label>
-              <input
-                type="number"
-                required
-                min={1}
-                step={1}
-                value={formData.capacity}
-                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">Create Event</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+      );
+    };
 
 const EditEventModal = ({ event, onClose }) => {
   const [formData, setFormData] = useState({
@@ -597,90 +496,7 @@ const EditEventModal = ({ event, onClose }) => {
   );
 };
 
-const EventDetailsModal = ({ event, computedStatus, onClose, onShowParticipants }) => {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{event.title}</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        <div style={{ padding: '20px 30px 30px 30px' }}>
-          {event.description && (
-            <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f9f8', borderLeft: '4px solid #0f766e', borderRadius: '4px' }}>
-              <p style={{ margin: '0', color: '#333', lineHeight: '1.6' }}>{event.description}</p>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}><span className={`status-badge ${computedStatus || event.status}`}>{computedStatus || event.status}</span></p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.registered} / {event.capacity}</p>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity Progress</p>
-              <div className="progress-bar" style={{ marginTop: '8px' }}>
-                <div
-                  className="progress-fill"
-                  style={{ width: `${(event.registered / event.capacity) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-          <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.organizerName || '—'}</p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.organizerEmail || '—'}</p>
-            </div>
-            {event.staff && event.staff.length > 0 && (
-              <div style={{ gridColumn: '1 / -1' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Staff</p>
-                <div style={{ margin: '0', fontSize: '15px', color: '#333' }}>
-                  {event.staff.map((staffMember, idx) => (
-                    <p key={idx} style={{ margin: '4px 0', paddingLeft: '8px', borderLeft: '2px solid #d1fae5' }}>{staffMember}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Time</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.time}</p>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</p>
-              <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{event.location}</p>
-            </div>
-          </div>
-          <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button className="btn-secondary" onClick={onClose}>Close</button>
-            <button
-              className="btn-primary"
-              onClick={onShowParticipants}
-              style={{ background: 'linear-gradient(135deg, #0f766e 0%, #054e48 100%)' }}
-            >
-              Participants
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+
 
 const ParticipantsModal = ({ event, onClose }) => {
   const [participants, setParticipants] = useState(() => {
