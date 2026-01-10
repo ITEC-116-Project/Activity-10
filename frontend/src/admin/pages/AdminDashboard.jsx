@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< Updated upstream
 import { authService } from '../../shared/services/authService';
-=======
 import Swal from 'sweetalert2';
->>>>>>> Stashed changes
 import '../styles/AdminDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import Home from './Home.jsx';
@@ -51,10 +48,6 @@ const AdminDashboard = () => {
     return () => window.removeEventListener('storage', onStorage);
   }, [navigate]);
 
-<<<<<<< Updated upstream
-  const handleLogout = () => {
-    authService.logout();
-=======
   const handleLogout = async () => {
     const res = await Swal.fire({
       title: 'Logout',
@@ -69,8 +62,7 @@ const AdminDashboard = () => {
 
     if (!res.isConfirmed) return;
 
-    localStorage.clear();
->>>>>>> Stashed changes
+    authService.logout();
     navigate('/login');
   };
 

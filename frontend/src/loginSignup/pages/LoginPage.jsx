@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< Updated upstream
 import { authService } from '../../shared/services/authService';
-=======
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
->>>>>>> Stashed changes
 import '../../loginSignup/styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -14,11 +11,8 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-<<<<<<< Updated upstream
   const [remember, setRemember] = useState(true); // keep logged in by default
-=======
   const [showPassword, setShowPassword] = useState(false);
->>>>>>> Stashed changes
   const navigate = useNavigate();
 
   // If already have a token in localStorage or sessionStorage, validate and redirect
