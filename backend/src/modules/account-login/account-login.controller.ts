@@ -28,4 +28,12 @@ export class AccountLoginController {
   async validateUser(@Request() req) {
     return this.accountLoginService.validateUser(req.user.userId);
   }
+
+  @Post('change-password')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  async changePassword(@Request() req, @Body() body: { currentPassword: string; newPassword: string }) {
+    return this.accountLoginService.changePassword(req.user.userId, body.currentPassword, body.newPassword);
+  }
 }

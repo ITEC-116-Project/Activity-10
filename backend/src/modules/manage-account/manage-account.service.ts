@@ -86,6 +86,7 @@ export class ManageAccountService {
       attendee.role = role;
       attendee.phone = dto.phone ?? null;
       attendee.university = dto.university ?? null;
+      attendee.companyName = dto.companyName ?? null;
       attendee.isActive = false; // new accounts start inactive
 
       created = await this.attendeesRepository.save(attendee);
@@ -152,6 +153,7 @@ export class ManageAccountService {
     } else if (role === 'attendees') {
       (account as Attendees).phone = dto.phone ?? (account as Attendees).phone ?? null;
       (account as Attendees).university = dto.university ?? (account as Attendees).university ?? null;
+      (account as Attendees).companyName = dto.companyName ?? (account as Attendees).companyName ?? null;
       (account as Attendees).isActive = dto.isActive ?? (account as Attendees).isActive ?? false;
     }
 

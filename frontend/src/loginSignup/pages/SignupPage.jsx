@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import '../../loginSignup/styles/SignupPage.css';
 
 const SignupPage = () => {
@@ -14,13 +16,22 @@ const SignupPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+
+    // Hide any visible password when the user types for security
+    if (name === 'password') setShowPassword(false);
+    if (name === 'confirmPassword') setShowConfirmPassword(false);
+
     setError('');
   };
 
@@ -35,6 +46,7 @@ const SignupPage = () => {
       setLoading(false);
       return;
     }
+
 
     try {
       const response = await fetch('http://localhost:3000/account-login/signup', {
@@ -55,7 +67,14 @@ const SignupPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Account created successfully! Please login.');
+        // Save profile fields locally so profile UI can show them immediately
+        localStorage.setItem('username', formData.username || '');
+        localStorage.setItem('firstName', formData.firstName || '');
+        localStorage.setItem('lastName', formData.lastName || '');
+        localStorage.setItem('email', formData.email || '');
+
+        // Redirect user to login page (do not auto-login to dashboard)
+        Swal.fire({ icon: 'success', title: 'Account created', text: 'Please login to continue', confirmButtonColor: '#0f766e' });
         navigate('/login');
       } else {
         setError(data.message || 'Signup failed. Please try again.');
@@ -138,28 +157,72 @@ const SignupPage = () => {
           </div>
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-              minLength="6"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Enter your password"
+                minLength="6"
+                style={{ paddingRight: '40px' }}
+              />
+              {formData.password.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280'
+                  }}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                {showPassword ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              )}
+            </div>
           </div>
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              placeholder="Confirm your password"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                placeholder="Confirm your password"
+                style={{ paddingRight: '40px' }}
+              />
+              {formData.confirmPassword.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((s) => !s)}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280'
+                  }}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              )}
+            </div>
           </div>
           {error && <div className="error-message">{error}</div>}
           <button type="submit" className="signup-button" disabled={loading}>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< Updated upstream
 import { authService } from '../../shared/services/authService';
+=======
+import Swal from 'sweetalert2';
+>>>>>>> Stashed changes
 import '../styles/OrganizerDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import Home from './Home.jsx';
@@ -45,8 +49,26 @@ const OrganizerDashboard = () => {
     return () => window.removeEventListener('storage', onStorage);
   }, [navigate]);
 
+<<<<<<< Updated upstream
   const handleLogout = () => {
     authService.logout();
+=======
+  const handleLogout = async () => {
+    const res = await Swal.fire({
+      title: 'Logout',
+      text: 'Are you sure you want to logout?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Logout',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#0f766e',
+      cancelButtonColor: '#6b7280'
+    });
+
+    if (!res.isConfirmed) return;
+
+    localStorage.clear();
+>>>>>>> Stashed changes
     navigate('/login');
   };
 

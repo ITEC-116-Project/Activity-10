@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< Updated upstream
 import { authService } from '../../shared/services/authService';
+=======
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
+>>>>>>> Stashed changes
 import '../../loginSignup/styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -10,7 +14,11 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+<<<<<<< Updated upstream
   const [remember, setRemember] = useState(true); // keep logged in by default
+=======
+  const [showPassword, setShowPassword] = useState(false);
+>>>>>>> Stashed changes
   const navigate = useNavigate();
 
   // If already have a token in localStorage or sessionStorage, validate and redirect
@@ -45,10 +53,16 @@ const LoginPage = () => {
   }, [navigate]);
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+
+    // If user types into password, hide the visible password for security
+    if (name === 'password') setShowPassword(false);
+
     setError('');
   };
 
@@ -122,15 +136,37 @@ const LoginPage = () => {
           </div>
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter your password"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Enter your password"
+                style={{ paddingRight: '40px' }}
+              />
+              {formData.password.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280'
+                  }}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                {showPassword ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              )}
+            </div>
           </div>
           <div className="form-group remember-me">
             <input

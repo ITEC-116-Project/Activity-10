@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Users } from '../../typeorm/entities/users';
@@ -184,5 +184,63 @@ export class AccountLoginService {
     }
 
     throw new UnauthorizedException('User not found');
+  }
+
+  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+    console.log('[changePassword] called for userId:', userId);
+
+    if (!currentPassword || !newPassword) {
+      console.log('[changePassword] missing fields');
+      throw new BadRequestException('Both current and new password are required');
+    }
+
+    // find user across role tables
+    let user: any = await this.adminRepository.findOne({ where: { id: userId } });
+    let repo: any = this.adminRepository;
+    let roleFound = 'admin';
+
+    if (!user) {
+      user = await this.organizerRepository.findOne({ where: { id: userId } });
+      repo = this.organizerRepository;
+      roleFound = 'organizer';
+    }
+
+    if (!user) {
+      user = await this.attendeesRepository.findOne({ where: { id: userId } });
+      repo = this.attendeesRepository;
+      roleFound = 'attendees';
+    }
+
+    if (!user) {
+      console.log('[changePassword] user not found');
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      console.log('[changePassword] invalid current password for userId:', userId);
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    if (newPassword.length < 8) {
+      console.log('[changePassword] new password too short');
+      throw new BadRequestException('New password must be at least 8 characters long');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    user.password = hashed;
+
+    await repo.save(user);
+
+    // update global users table if present
+    const globalUser = await this.usersRepository.findOne({ where: { email: user.email } });
+    if (globalUser) {
+      globalUser.password = hashed;
+      await this.usersRepository.save(globalUser);
+    }
+
+    console.log('[changePassword] success for userId:', userId, 'role:', roleFound);
+
+    return { message: 'Password updated successfully' };
   }
 }

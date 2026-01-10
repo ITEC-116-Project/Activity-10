@@ -29,8 +29,11 @@ export class Attendees {
   @Column({ type: 'varchar', length: 255, nullable: true })
   university: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  companyName: string | null;
+
   @Column({ type: 'boolean', default: false })
-  isActive: boolean;
+  isActive: boolean; 
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
