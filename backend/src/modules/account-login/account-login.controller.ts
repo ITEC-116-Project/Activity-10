@@ -26,7 +26,7 @@ export class AccountLoginController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Validate and fetch current user by JWT' })
   async validateUser(@Request() req) {
-    return this.accountLoginService.validateUser(req.user.userId);
+    return this.accountLoginService.validateUser(req.user.userId, req.user.role);
   }
 
   @Post('change-password')

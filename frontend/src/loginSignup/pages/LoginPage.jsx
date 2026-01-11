@@ -17,11 +17,12 @@ const LoginPage = () => {
   // If already have a token in localStorage or sessionStorage, validate and redirect
   useEffect(() => {
     const autoRedirect = async () => {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
       if (!token) return;
       try {
         await authService.validateToken();
-        const role = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
+        const role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+        console.log('[LoginPage] Auto-redirect - token exists, role:', role);
         switch (role) {
           case 'admin':
             navigate('/admin/dashboard');
@@ -37,6 +38,7 @@ const LoginPage = () => {
         }
       } catch (err) {
         // invalid token — make sure storage is cleaned
+        console.log('[LoginPage] Token validation failed, clearing storage');
         localStorage.clear();
         sessionStorage.clear();
       }
@@ -77,6 +79,7 @@ const LoginPage = () => {
 
       if (response.ok) {
         // Clear both storages to avoid conflicts with old data and store session-only values
+        console.log('[LoginPage] Login successful - role:', data.role, 'userId:', data.userId);
         localStorage.clear();
         sessionStorage.clear();
 
@@ -86,6 +89,9 @@ const LoginPage = () => {
         sessionStorage.setItem('username', data.username);
         sessionStorage.setItem('firstName', data.firstName);
         sessionStorage.setItem('lastName', data.lastName);
+        sessionStorage.setItem('email', data.email);
+
+        console.log('[LoginPage] Storage set - userRole:', sessionStorage.getItem('userRole'));
 
         // Navigate based on role
         switch (data.role) {

@@ -66,16 +66,19 @@ const Profile = () => {
   }, [newPassword]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
+    
+    // Initialize formData with empty values - will be filled by API
+    setFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      company: '',
+      phone: ''
+    });
+
     if (!token) {
-      // fall back to localStorage-only behavior
-      setFormData({
-        firstName: localStorage.getItem('firstName') || '',
-        lastName: localStorage.getItem('lastName') || '',
-        email: localStorage.getItem('email') || '',
-        company: localStorage.getItem('company') || '',
-        phone: localStorage.getItem('phone') || ''
-      });
+      // fall back to sessionStorage-only behavior
       return;
     }
 
@@ -106,28 +109,28 @@ const Profile = () => {
         setLastSynced(new Date().toISOString());
 
         setFormData({
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          email: profile.email || '',
-          company: profile.companyName || '',
-          phone: profile.phone || ''
+          firstName: profile.firstName || sessionStorage.getItem('firstName') || '',
+          lastName: profile.lastName || sessionStorage.getItem('lastName') || '',
+          email: profile.email || sessionStorage.getItem('email') || '',
+          company: profile.companyName || sessionStorage.getItem('company') || '',
+          phone: profile.phone || sessionStorage.getItem('phone') || ''
         });
 
-        // Keep localStorage in sync for offline fallback
-        localStorage.setItem('firstName', profile.firstName || '');
-        localStorage.setItem('lastName', profile.lastName || '');
-        localStorage.setItem('email', profile.email || '');
-        localStorage.setItem('company', profile.companyName || '');
-        localStorage.setItem('phone', profile.phone || '');
+        // Keep sessionStorage in sync for offline fallback
+        sessionStorage.setItem('firstName', profile.firstName || '');
+        sessionStorage.setItem('lastName', profile.lastName || '');
+        sessionStorage.setItem('email', profile.email || sessionStorage.getItem('email') || '');
+        sessionStorage.setItem('company', profile.companyName || '');
+        sessionStorage.setItem('phone', profile.phone || '');
       })
       .catch(() => {
-        // If backend calls fail, fallback to localStorage values already set above
+        // If backend calls fail, fallback to sessionStorage values already set above
         setFormData({
-          firstName: localStorage.getItem('firstName') || '',
-          lastName: localStorage.getItem('lastName') || '',
-          email: localStorage.getItem('email') || '',
-          company: localStorage.getItem('company') || '',
-          phone: localStorage.getItem('phone') || ''
+          firstName: sessionStorage.getItem('firstName') || localStorage.getItem('firstName') || '',
+          lastName: sessionStorage.getItem('lastName') || localStorage.getItem('lastName') || '',
+          email: sessionStorage.getItem('email') || localStorage.getItem('email') || '',
+          company: sessionStorage.getItem('company') || localStorage.getItem('company') || '',
+          phone: sessionStorage.getItem('phone') || localStorage.getItem('phone') || ''
         });
       });
   }, []);
@@ -135,7 +138,7 @@ const Profile = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     if (token && userMeta.userId && userMeta.role) {
       // persist to backend
@@ -155,14 +158,8 @@ const Profile = () => {
           return r.json();
         })
         .then((updated) => {
-          // update local view and localStorage with the server's authoritative object
+          // update local view with the server's authoritative object
           setProfileMeta(updated);
-
-          localStorage.setItem('firstName', updated.firstName || formData.firstName);
-          localStorage.setItem('lastName', updated.lastName || formData.lastName);
-          localStorage.setItem('email', updated.email || formData.email);
-          localStorage.setItem('company', updated.companyName ?? formData.company);
-          localStorage.setItem('phone', updated.phone ?? formData.phone);
 
           setFormData({
             firstName: updated.firstName || formData.firstName,
@@ -179,31 +176,23 @@ const Profile = () => {
           Swal.fire({ icon: 'error', title: 'Update Failed', text: err.message || 'Unable to save profile', confirmButtonText: 'OK', confirmButtonColor: '#0f766e' });
         });
     } else {
-      // fallback to localStorage-only update
-      localStorage.setItem('firstName', formData.firstName);
-      localStorage.setItem('lastName', formData.lastName);
-      localStorage.setItem('email', formData.email);
-      localStorage.setItem('company', formData.company);
-      localStorage.setItem('phone', formData.phone);
-
-      setIsEditing(false);
-      Swal.fire({ icon: 'success', title: 'Profile Updated!', text: 'Your profile has been updated locally.', confirmButtonText: 'OK', confirmButtonColor: '#0f766e' });
+      Swal.fire({ icon: 'error', title: 'Error', text: 'You must be logged in to update your profile', confirmButtonText: 'OK', confirmButtonColor: '#0f766e' });
     }
   };
 
   const handleCancel = () => {
     setFormData({
-      firstName: localStorage.getItem('firstName') || '',
-      lastName: localStorage.getItem('lastName') || '',
-      email: localStorage.getItem('email') || '',
-      company: localStorage.getItem('company') || '',
-      phone: localStorage.getItem('phone') || ''
+      firstName: profileMeta?.firstName || '',
+      lastName: profileMeta?.lastName || '',
+      email: profileMeta?.email || '',
+      company: profileMeta?.companyName || '',
+      phone: profileMeta?.phone || ''
     });
     setIsEditing(false);
   };
 
   const refreshProfile = async () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token || !userMeta.userId || !userMeta.role) {
       Swal.fire({ icon: 'warning', title: 'Unable to refresh', text: 'You need to be logged in to refresh profile.', confirmButtonText: 'OK', confirmButtonColor: '#0f766e' });
       return;
@@ -248,7 +237,7 @@ const Profile = () => {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token) {
       Swal.fire({ icon: 'error', title: 'Not authenticated', text: 'Please log in first to change your password', confirmButtonText: 'OK', confirmButtonColor: '#0f766e' });
       return;
@@ -296,14 +285,11 @@ const Profile = () => {
     }
   };
 
-  // compute display name and initials for avatar (fallback to session/local storage)
-  const storedFirst = sessionStorage.getItem('firstName') || localStorage.getItem('firstName') || '';
-  const storedLast = sessionStorage.getItem('lastName') || localStorage.getItem('lastName') || '';
-  const storedUsername = sessionStorage.getItem('username') || localStorage.getItem('username') || '';
-  const displayFirst = profileMeta?.firstName || formData.firstName || storedFirst || '';
-  const displayLast = profileMeta?.lastName || formData.lastName || storedLast || '';
-  const displayName = (displayFirst || displayLast) ? `${displayFirst} ${displayLast}`.trim() : (profileMeta?.name || storedUsername || profileMeta?.username || 'Not set');
-  const initials = ((displayFirst && displayFirst.charAt(0)) || (storedUsername && storedUsername.charAt(0)) || '').toUpperCase() + ((displayLast && displayLast.charAt(0)) || (storedUsername && storedUsername.charAt(1)) || '').toUpperCase();
+  // compute display name and initials for avatar (use only profileMeta and formData)
+  const displayFirst = profileMeta?.firstName || formData.firstName || '';
+  const displayLast = profileMeta?.lastName || formData.lastName || '';
+  const displayName = (displayFirst || displayLast) ? `${displayFirst} ${displayLast}`.trim() : (profileMeta?.username || 'Not set');
+  const initials = ((displayFirst && displayFirst.charAt(0)) || '').toUpperCase() + ((displayLast && displayLast.charAt(0)) || '').toUpperCase();
 
   return (
     <div className="section">
@@ -340,15 +326,20 @@ const Profile = () => {
                 {profileMeta && (
                   <div style={{ marginTop: '8px', textAlign: 'center' }}>
                     <div style={{ marginTop: '6px', fontSize: '13px', color: '#6b7280' }}>
-                      Username: <strong style={{ color: '#111827' }}>{profileMeta?.username || (sessionStorage.getItem('username') || localStorage.getItem('username')) || '—'}</strong>
+                      Username: <strong style={{ color: '#111827' }}>{profileMeta?.username || '—'}</strong>
                     </div>
                   </div>
                 )}
               </div>
               <div className="profile-details" style={{ textAlign: 'left' }}>
                 <div className="profile-field" style={{ marginBottom: '15px', padding: '15px', background: '#f9fafb', borderRadius: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px', fontWeight: '600' }}>Username</label>
+                  <p style={{ margin: 0, fontSize: '16px', color: '#111827' }}>{profileMeta?.username || 'Not provided'}</p>
+                </div>
+
+                <div className="profile-field" style={{ marginBottom: '15px', padding: '15px', background: '#f9fafb', borderRadius: '8px' }}>
                   <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '5px', fontWeight: '600' }}>Email *</label>
-                  <p style={{ margin: 0, fontSize: '16px', color: formData.email ? '#111827' : '#9ca3af' }}>{formData.email || 'Not provided'}</p>
+                  <p style={{ margin: 0, fontSize: '16px', color: formData.email || profileMeta?.email ? '#111827' : '#9ca3af' }}>{formData.email || profileMeta?.email || 'Not provided'}</p>
                 </div>
 
                 <div className="profile-field" style={{ marginBottom: '15px', padding: '15px', background: '#f9fafb', borderRadius: '8px' }}>

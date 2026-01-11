@@ -145,45 +145,30 @@ export class AccountLoginService {
     };
   }
 
-  async validateUser(userId: number) {
-    // Try to find in all tables
-    let user = await this.adminRepository.findOne({ where: { id: userId } });
-    if (user) {
-      return {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      };
+  async validateUser(userId: number, role: string) {
+    // Use the role from JWT to fetch from the correct table
+    let user: any;
+
+    if (role === 'admin') {
+      user = await this.adminRepository.findOne({ where: { id: userId } });
+    } else if (role === 'organizer') {
+      user = await this.organizerRepository.findOne({ where: { id: userId } });
+    } else if (role === 'attendees') {
+      user = await this.attendeesRepository.findOne({ where: { id: userId } });
     }
 
-    user = await this.organizerRepository.findOne({ where: { id: userId } });
-    if (user) {
-      return {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      };
+    if (!user) {
+      throw new UnauthorizedException('User not found');
     }
 
-    user = await this.attendeesRepository.findOne({ where: { id: userId } });
-    if (user) {
-      return {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      };
-    }
-
-    throw new UnauthorizedException('User not found');
+    return {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    };
   }
 
   async changePassword(userId: number, currentPassword: string, newPassword: string) {

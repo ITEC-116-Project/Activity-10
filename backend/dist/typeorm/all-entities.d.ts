@@ -1,2 +1,4 @@
 import { Users } from "./entities/users";
-export declare const AllEntities: (typeof Users)[];
+import { Event } from "./entities/event";
+import { EventAttendees } from "./entities/event-attendees";
+export declare const AllEntities: (typeof Users | typeof Event | typeof EventAttendees)[];

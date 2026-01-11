@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from "typeorm";
+import { EventAttendees } from "./event-attendees";
 
 @Entity({ name: 'attendee_ten' })
 export class Attendees {
@@ -40,4 +41,7 @@ export class Attendees {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
   updatedAt: Date;
+
+  @OneToMany(() => EventAttendees, (eventAttendee) => eventAttendee.attendee)
+  registrations: EventAttendees[];
 }

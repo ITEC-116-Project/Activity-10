@@ -10,51 +10,32 @@ const BrowseEvents = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [startRegister, setStartRegister] = useState(false);
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const events = [
-    {
-      id: 1,
-      title: 'Tech Conference 2026',
-      date: '2026-02-15',
-      time: '09:00 - 17:00',
-      location: 'Manila Convention Center',
-      capacity: 500,
-      registered: 234,
-      status: 'upcoming',
-      description: 'A full-day technology conference covering AI, cloud, and modern web development.',
-      organizerName: 'Tech Innovators Inc.',
-      organizerEmail: 'events@techinnovators.com',
-      staff: ['John Smith - Lead Organizer', 'Maria Garcia - Logistics Manager', 'David Chen - Technical Lead']
-    },
-    {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'ongoing',
-      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.',
-      organizerName: 'Dev Academy Asia',
-      organizerEmail: 'workshops@devacademy.ph',
-      staff: ['Sarah Johnson - Workshop Instructor', 'Alex Rodriguez - Technical Support']
-    },
-    {
-      id: 3,
-      title: 'Business Seminar',
-      date: '2026-03-10',
-      time: '10:00 - 16:00',
-      location: 'Makati Business Center',
-      capacity: 200,
-      registered: 145,
-      status: 'upcoming',
-      description: 'Executive seminar on scaling operations, finance strategies, and leadership.',
-      organizerName: 'Business Excellence Corp',
-      organizerEmail: 'seminars@bizexcellence.com',
-      staff: ['Robert Thompson - Chief Facilitator', 'Linda Wong - Program Coordinator', 'Michael Santos - Finance Expert']
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3000/events');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch events: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setEvents(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setError(err.message);
+      setEvents([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const filteredEvents = events.filter(event => {
     const isActiveEvent = event.status === 'upcoming' || event.status === 'ongoing';
@@ -62,7 +43,7 @@ const BrowseEvents = () => {
       event.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'active' ? isActiveEvent :
       (filterStatus === 'all' ? true : event.status === filterStatus);
-    return matchesSearch && matchesFilter && isActiveEvent;
+    return matchesSearch && matchesFilter;
   });
 
   const itemsPerPage = viewMode === 'card' ? 5 : 10;
@@ -89,23 +70,41 @@ const BrowseEvents = () => {
     <div className="section">
       <h2>Events</h2>
 
-      <div className="search-bar">
-        <input
-          type="text"
-          placeholder="Search events by name or location..."
-          value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
-        />
-        <select value={filterStatus} onChange={(e) => handleFilterChange(e.target.value)}>
-          <option value="active">Upcoming & Ongoing</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="ongoing">Ongoing</option>
-        </select>
-        <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} className="view-mode-select">
-          <option value="card">⊞ Cards</option>
-          <option value="table">≡ Table</option>
-        </select>
-      </div>
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '16px', color: '#666' }}>
+          <p>Loading events...</p>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: '15px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '4px', color: '#991b1b', marginBottom: '20px' }}>
+          <p>Error loading events: {error}</p>
+          <button className="btn-secondary" onClick={fetchEvents} style={{ marginTop: '10px' }}>
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          <div className="search-bar">
+            <input
+              type="text"
+              placeholder="Search events by name or location..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+            <select value={filterStatus} onChange={(e) => handleFilterChange(e.target.value)}>
+              <option value="active">Upcoming & Ongoing</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="all">All Events</option>
+            </select>
+            <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} className="view-mode-select">
+              <option value="card">⊞ Cards</option>
+              <option value="table">≡ Table</option>
+            </select>
+          </div>
 
       {viewMode === 'card' ? (
         <>
@@ -233,40 +232,87 @@ const BrowseEvents = () => {
           onClose={() => { setSelectedEvent(null); setStartRegister(false); }}
         />
       )}
+        </>
+      )}
     </div>
   );
 };
 
 const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
-  const userName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '';
-  const userEmail = localStorage.getItem('email') || '';
-  const userCompany = localStorage.getItem('company') || '';
-  
-  const [isRegistered, setIsRegistered] = useState(() => {
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.some(t => t.eventId === event.id && t.userName === userName);
-    } catch {
-      return false;
-    }
+  const [profileMeta, setProfileMeta] = useState(null);
+  const [userMeta, setUserMeta] = useState({ userId: null, role: null });
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: ''
   });
 
-  const [showRegistrationForm, setShowRegistrationForm] = useState(startRegister && !isRegistered);
+  // Fetch profile data from backend on mount
   useEffect(() => {
-    if (startRegister && !isRegistered) {
+    const fetchProfile = async () => {
+      const token = sessionStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const validateResponse = await fetch('http://localhost:3000/account-login/validate', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!validateResponse.ok) throw new Error('Failed to validate user');
+        
+        const { userId, role } = await validateResponse.json();
+        setUserMeta({ userId, role });
+
+        const profileResponse = await fetch(`http://localhost:3000/manage-account/${role}/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!profileResponse.ok) throw new Error('Failed to fetch profile');
+        
+        const profile = await profileResponse.json();
+        setProfileMeta(profile);
+        
+        // Update formData with fetched profile
+        setFormData({
+          name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+          email: profile.email || '',
+          company: profile.companyName || ''
+        });
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Check if already registered via backend
+  useEffect(() => {
+    if (profileMeta && userMeta.userId) {
+      const checkRegistration = async () => {
+        try {
+          const response = await fetch(`http://localhost:3000/events/${event.id}/attendee/${userMeta.userId}/check`);
+          if (response.ok) {
+            const data = await response.json();
+            setIsRegistered(data.isRegistered);
+          }
+        } catch (err) {
+          console.error('Error checking registration:', err);
+        }
+      };
+      checkRegistration();
+    }
+  }, [profileMeta, userMeta.userId, event.id]);
+
+  useEffect(() => {
+    if (startRegister && !isRegistered && profileMeta) {
       setShowRegistrationForm(true);
     }
-  }, [startRegister, isRegistered]);
-  const [formData, setFormData] = useState({
-    name: userName,
-    email: userEmail,
-    company: userCompany
-  });
+  }, [startRegister, isRegistered, profileMeta]);
 
   const handleRegisterClick = () => {
     // Check if profile is complete (only name and email are required)
-    if (!userName || !userEmail) {
+    if (!formData.name || !formData.email) {
       Swal.fire({
         icon: 'warning',
         title: 'Incomplete Profile',
@@ -288,30 +334,63 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
     handleRegister({ preventDefault: () => {} });
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     
+    const token = sessionStorage.getItem('token');
+    if (!token || !userMeta.userId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'You must be logged in to register for events',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#dc2626'
+      });
+      return;
+    }
+
     const ticketId = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     const qrData = JSON.stringify({ ticketId, eventId: event.id, eventTitle: event.title, userName: formData.name, email: formData.email });
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
 
-    const ticket = {
-      id: ticketId,
-      ticketId,
-      eventId: event.id,
-      eventTitle: event.title,
-      date: event.date,
-      time: event.time,
-      location: event.location,
-      status: event.status,
-      registeredAt: new Date().toISOString(),
-      userName: formData.name,
-      email: formData.email,
-      company: formData.company,
-      qrCode: qrUrl
-    };
-
     try {
+      // Register through backend API
+      const registrationResponse = await fetch('http://localhost:3000/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          attendeeId: userMeta.userId,
+          attendeeName: formData.name,
+          ticketCode: ticketId
+        })
+      });
+
+      if (!registrationResponse.ok) {
+        const errorData = await registrationResponse.json();
+        throw new Error(errorData.message || 'Failed to register for event');
+      }
+
+      // Also save to localStorage for immediate display
+      const ticket = {
+        id: ticketId,
+        ticketId,
+        eventId: event.id,
+        eventTitle: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        status: event.status,
+        registeredAt: new Date().toISOString(),
+        userName: formData.name,
+        email: formData.email,
+        company: formData.company,
+        qrCode: qrUrl
+      };
+
       const raw = localStorage.getItem('myTickets');
       const tickets = raw ? JSON.parse(raw) : [];
       tickets.push(ticket);
@@ -401,12 +480,14 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.organizerName || '—'}</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.createdByName || '—'}</p>
               </div>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.organizerEmail || '—'}</p>
-              </div>
+              {event.createdByName && (
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer ID</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.createdBy || '—'}</p>
+                </div>
+              )}
               {/* {event.staff && event.staff.length > 0 && (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Staff</p>
