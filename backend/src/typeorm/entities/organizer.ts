@@ -32,6 +32,9 @@ export class Organizer {
   @Column({ type: 'boolean', default: false })
   isActive: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  temporaryPassword: boolean;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 

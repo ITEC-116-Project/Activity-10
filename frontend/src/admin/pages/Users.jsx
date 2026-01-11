@@ -166,8 +166,17 @@ const Users = () => {
 
       // Prevent duplicates when adding (remove any existing user with same role+email)
       setUsers((prev) => [created, ...prev.filter(u => !(u.role === created.role && (u.email || '').toLowerCase() === (created.email || '').toLowerCase()))]);
-      // Show a success notification but don't reveal the temporary password in the alert
-      Swal.fire({ icon: 'success', title: 'User added', text: 'User was created successfully.' });
+      // Show a success notification. If a temporary password was generated, show it once to the admin
+      if (created.temporaryPassword) {
+        Swal.fire({
+          icon: 'success',
+          title: 'User added',
+          html: `User was created successfully.<br/><br/><strong>Temporary Password:</strong> <code style="background:#f3f4f6;padding:6px;border-radius:4px;">${created.temporaryPassword}</code><br/><small style="color:#666">(This password was also sent to the user via email.)</small>`,
+          confirmButtonText: 'OK',
+        });
+      } else {
+        Swal.fire({ icon: 'success', title: 'User added', text: 'User was created successfully.' });
+      }
       setShowAddModal(false);
       resetForm();
     } catch (err) {

@@ -9,11 +9,13 @@ import UserAvatar from '../../shared/components/UserAvatar.jsx';
 import BrowseEvents from './BrowseEvents.jsx';
 import MyTickets from './MyTickets.jsx';
 import Profile from './Profile.jsx';
+import ForceChangePasswordModal from '../../shared/components/ForceChangePasswordModal';
 
 const AttendeesDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('');
   const [activeSection, setActiveSection] = useState('events');
+  const [showForceChange, setShowForceChange] = useState(false);
 
   useEffect(() => {
     const role = authService.getRole();
@@ -26,6 +28,8 @@ const AttendeesDashboard = () => {
 
     const storedName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Attendee';
     setUserName(storedName);
+
+  if (sessionStorage.getItem('requiresPasswordChange')) setShowForceChange(true);
 
     // Listen for profile navigation event
     const handleNavigateToProfile = () => {
@@ -89,6 +93,7 @@ const AttendeesDashboard = () => {
         <SideNav activeSection={activeSection} onChange={setActiveSection} />
         <main className="main-content">
           {renderContent()}
+          {showForceChange && <ForceChangePasswordModal onClose={() => setShowForceChange(false)} />}
         </main>
       </div>
     </div>

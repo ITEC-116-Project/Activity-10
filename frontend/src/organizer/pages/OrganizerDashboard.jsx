@@ -11,6 +11,7 @@ import Events from './Events.jsx';
 import MyTickets from './MyTickets.jsx';
 import Reports from './Reports.jsx';
 import Profile from './Profile.jsx';
+import ForceChangePasswordModal from '../../shared/components/ForceChangePasswordModal';
 
 const OrganizerDashboard = () => {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const OrganizerDashboard = () => {
   const [activeSection, setActiveSection] = useState('home');
   const [selectedEventForEdit, setSelectedEventForEdit] = useState(null);
   const [hasTicket, setHasTicket] = useState(false);
+  const [showForceChange, setShowForceChange] = useState(false);
 
   useEffect(() => {
     const role = authService.getRole();
@@ -30,6 +32,7 @@ const OrganizerDashboard = () => {
 
     const storedName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Organizer';
     setUserName(storedName);
+  if (sessionStorage.getItem('requiresPasswordChange')) setShowForceChange(true);
     // Check if organizer has any tickets stored locally
     const loadTickets = () => {
       try {
@@ -117,6 +120,7 @@ const OrganizerDashboard = () => {
         <SideNav activeSection={activeSection} onChange={setActiveSection} />
         <main className="main-content">
           {renderContent()}
+          {showForceChange && <ForceChangePasswordModal onClose={() => setShowForceChange(false)} />}
         </main>
       </div>
     </div>
