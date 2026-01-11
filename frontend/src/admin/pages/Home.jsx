@@ -254,42 +254,6 @@ const Home = ({ onRedirectToEdit }) => {
           />
         )}
       </div>
-
-      <div className="events-section" style={{ marginTop: '20px' }}>
-        <h3>Active Accounts</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div className="card" style={{ padding: '12px' }}>
-            <h4 style={{ marginBottom: '8px' }}>Active Attendees ({activeAttendeeList.length})</h4>
-            {activeAttendeeList.length === 0 ? (
-              <div className="empty-state"><p>No active attendees</p></div>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {activeAttendeeList.map((a) => (
-                  <li key={`att-${a.id}`} style={{ padding: '8px 6px', borderBottom: '1px solid #eee' }}>
-                    <strong>{a.firstName} {a.lastName}</strong>
-                    <div style={{ color: '#555', fontSize: '12px' }}>{a.email}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="card" style={{ padding: '12px' }}>
-            <h4 style={{ marginBottom: '8px' }}>Active Organizers ({activeOrganizerList.length})</h4>
-            {activeOrganizerList.length === 0 ? (
-              <div className="empty-state"><p>No active organizers</p></div>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {activeOrganizerList.map((o) => (
-                  <li key={`org-${o.id}`} style={{ padding: '8px 6px', borderBottom: '1px solid #eee' }}>
-                    <strong>{o.firstName} {o.lastName}</strong>
-                    <div style={{ color: '#555', fontSize: '12px' }}>{o.email}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

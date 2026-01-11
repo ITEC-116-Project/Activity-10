@@ -10,7 +10,7 @@
 .dashboard-header {
   background: linear-gradient(135deg, #051937 0%, #0f766e 100%);
   color: white;
-  padding: 18px 40px;
+  padding: 18px 20px 18px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -20,6 +20,13 @@
   z-index: 900;
   height: var(--header-height);
   box-sizing: border-box;
+}
+
+/* Override header avatar circle to dark blue */
+.dashboard-header .avatar-circle {
+  background-color: #051937 !important;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .dashboard-header h1 {
