@@ -64,6 +64,15 @@ export class EventController {
     return { isRegistered };
   }
 
+  @Post(':registrationId/check-in')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark a registration as checked in' })
+  async checkIn(@Param('registrationId') registrationId: string) {
+    const updated = await this.svc.checkInRegistration(Number(registrationId));
+    return updated;
+  }
+
   @Post(':registrationId/cancel')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
