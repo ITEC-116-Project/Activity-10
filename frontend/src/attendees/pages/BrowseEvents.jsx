@@ -351,6 +351,7 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
     email: '',
     company: ''
   });
+  const [organizerDetails, setOrganizerDetails] = useState({ name: '', email: '' });
 
   // Fetch profile data from backend on mount
   useEffect(() => {
@@ -412,6 +413,37 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
       setShowRegistrationForm(true);
     }
   }, [startRegister, isRegistered, profileMeta]);
+
+  // Ensure organizer info is populated even when legacy events are missing fields
+  useEffect(() => {
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const nameFromEvent = `${event.createdByFirstName || ''} ${event.createdByLastName || ''}`.trim();
+    const fallbackName = nameFromEvent || event.createdByName || '';
+    const fallbackEmail = event.createdByEmail || '';
+    setOrganizerDetails({ name: fallbackName, email: fallbackEmail });
+
+    if (!event.createdBy || (fallbackName && fallbackEmail)) return;
+
+    const controller = new AbortController();
+
+    fetch(`${base}/manage-account/organizer/${event.createdBy}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (!profile) return;
+        const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+        setOrganizerDetails({
+          name: fullName || fallbackName || '—',
+          email: profile.email || fallbackEmail || '—',
+        });
+      })
+      .catch((err) => {
+        if (err?.name !== 'AbortError') {
+          console.error('Failed to fetch organizer details', err);
+        }
+      });
+
+    return () => controller.abort();
+  }, [event]);
 
   const handleRegisterClick = () => {
     // Check if profile is complete (only name and email are required)
@@ -583,11 +615,11 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{`${event.createdByFirstName || ''} ${event.createdByLastName || ''}`.trim() || event.createdByName || '—'}</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{organizerDetails.name || '—'}</p>
               </div>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer Email</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.createdByEmail || '—'}</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{organizerDetails.email || '—'}</p>
               </div>
             </div>
             <div className="modal-actions" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
