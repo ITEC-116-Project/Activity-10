@@ -4,6 +4,7 @@ import { authService } from '../../shared/services/authService';
 import Swal from 'sweetalert2';
 import '../styles/AdminDashboard.css';
 import SideNav from '../components/SideNav.jsx';
+import NotificationDropdownViewOnly from '../../shared/components/NotificationDropdownViewOnly.jsx';
 import Home from './Home.jsx';
 import Events from './Events.jsx';
 import MyTickets from './MyTickets.jsx';
@@ -94,6 +95,7 @@ const AdminDashboard = () => {
         <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
+          <NotificationDropdownViewOnly />
           <button onClick={handleLogout} className="logout-button">Logout</button>
         </div>
       </div>

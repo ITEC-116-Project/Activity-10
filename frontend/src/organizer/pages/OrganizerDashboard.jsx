@@ -4,6 +4,7 @@ import { authService } from '../../shared/services/authService';
 import Swal from 'sweetalert2';
 import '../styles/OrganizerDashboard.css';
 import SideNav from '../components/SideNav.jsx';
+import NotificationDropdown from '../components/NotificationDropdown.jsx';
 import Home from './Home.jsx';
 import Events from './Events.jsx';
 import MyTickets from './MyTickets.jsx';
@@ -99,6 +100,7 @@ const OrganizerDashboard = () => {
         <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
+          <NotificationDropdown />
           <button onClick={handleLogout} className="logout-button">Logout</button>
         </div>
       </div>

@@ -4,5 +4,6 @@ import { Organizer } from "./entities/organizer";
 import { Attendees } from "./entities/attendees";
 import { Event } from "./entities/event";
 import { EventAttendees } from "./entities/event-attendees";
+import { Announcement } from "./entities/announcement";
 
-export const AllEntities = [Users, Admin, Organizer, Attendees, Event, EventAttendees];
+export const AllEntities = [Users, Admin, Organizer, Attendees, Event, EventAttendees, Announcement];

@@ -4,6 +4,7 @@ import { authService } from '../../shared/services/authService';
 import Swal from 'sweetalert2';
 import '../styles/AttendeesDashboard.css';
 import SideNav from '../components/SideNav.jsx';
+import NotificationDropdownViewOnly from '../../shared/components/NotificationDropdownViewOnly.jsx';
 import BrowseEvents from './BrowseEvents.jsx';
 import MyTickets from './MyTickets.jsx';
 import Profile from './Profile.jsx';
@@ -71,6 +72,7 @@ const AttendeesDashboard = () => {
         <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
+          <NotificationDropdownViewOnly />
           <button onClick={handleLogout} className="logout-button">Logout</button>
         </div>
       </div>

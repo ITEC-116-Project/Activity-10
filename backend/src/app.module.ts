@@ -5,6 +5,7 @@ import { UserCrudModule } from './modules/user-crud/user-crud.module';
 import { AccountLoginModule } from './modules/account-login/account-login.module';
 import { ManageAccountModule } from './modules/manage-account/manage-account.module';
 import { EventModule } from './modules/event/event.module';
+import { AnnouncementModule } from './modules/announcement/announcement.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { EventModule } from './modules/event/event.module';
     AccountLoginModule, // ✅ Login authentication module
     ManageAccountModule,
     EventModule,
+    AnnouncementModule,
   ],
 })
 export class AppModule {}
