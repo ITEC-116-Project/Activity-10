@@ -45,4 +45,16 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   createdByName?: string;
+
+  @IsOptional()
+  @IsString()
+  createdByFirstName?: string;
+
+  @IsOptional()
+  @IsString()
+  createdByLastName?: string;
+
+  @IsOptional()
+  @IsString()
+  createdByEmail?: string;
 }

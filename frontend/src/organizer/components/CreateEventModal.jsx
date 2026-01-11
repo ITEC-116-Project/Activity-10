@@ -93,7 +93,10 @@ const CreateEventModal = ({ onClose, onCreate }) => {
       status,
       description: description.trim(),
       createdBy: localStorage.getItem('userId') || '1',
-      createdByName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Organizer'
+      createdByName: `${localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''} ${localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || ''}`.trim() || 'Organizer',
+      createdByFirstName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '',
+      createdByLastName: localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || '',
+      createdByEmail: localStorage.getItem('email') || sessionStorage.getItem('email') || 'organizer@email.com'
     };
 
     setSubmitting(true);

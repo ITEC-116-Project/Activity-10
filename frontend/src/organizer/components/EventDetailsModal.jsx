@@ -38,11 +38,11 @@ const EventDetailsModal = ({ event, computedStatus, onClose, onShowParticipants 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
             <div>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.organizerName || '—'}</p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{`${event.createdByFirstName || ''} ${event.createdByLastName || ''}`.trim() || event.organizerName || event.createdByName || '—'}</p>
             </div>
             <div>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.organizerEmail || '—'}</p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.createdByEmail || event.organizerEmail || '—'}</p>
             </div>
             {event.staff && event.staff.length > 0 && (
               <div style={{ gridColumn: '1 / -1' }}>

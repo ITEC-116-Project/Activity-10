@@ -197,7 +197,10 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           status: (new Date() < start) ? 'upcoming' : ((new Date() >= start && new Date() <= end) ? 'ongoing' : 'completed'),
           description: newEvent.description || '',
           createdBy: localStorage.getItem('userId') || '1',
-          createdByName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''
+          createdByName: `${localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''} ${localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || ''}`.trim() || 'Organizer',
+          createdByFirstName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '',
+          createdByLastName: localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || '',
+          createdByEmail: localStorage.getItem('email') || sessionStorage.getItem('email') || ''
         };
 
         const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';

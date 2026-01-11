@@ -39,6 +39,15 @@ export class Event {
   @Column({ type: 'varchar', length: 255, nullable: true })
   createdByName: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  createdByFirstName: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  createdByLastName: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  createdByEmail: string | null;
+
   @OneToMany(() => EventAttendees, (eventAttendee) => eventAttendee.event)
   attendees: EventAttendees[];
 }

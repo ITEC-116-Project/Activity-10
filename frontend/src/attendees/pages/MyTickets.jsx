@@ -50,7 +50,9 @@ const MyTickets = () => {
             ticketCode: reg.ticketCode,
             eventId: reg.eventId,
             eventTitle: event?.title || 'Event',
-            attendeeName: reg.attendeeName,
+            organizerName: event?.createdByName || 'Organizer',
+            attendeeName: reg.attendeeName || `${sessionStorage.getItem('firstName') || ''} ${sessionStorage.getItem('lastName') || ''}`.trim() || '',
+            attendeeEmail: sessionStorage.getItem('email') || '',
             registeredAt: reg.registeredAt
           });
           const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
@@ -66,9 +68,8 @@ const MyTickets = () => {
             location: event?.location || '',
             status: event?.status || 'upcoming',
             registeredAt: reg.registeredAt,
-            userName: reg.attendeeName,
-            email: '',
-            company: '',
+            organizerName: `${event?.createdByFirstName || ''} ${event?.createdByLastName || ''}`.trim() || event?.createdByName || 'Organizer',
+            organizerEmail: event?.createdByEmail || 'organizer@email.com',
             qrCode: qrUrl
           };
         });
@@ -105,8 +106,8 @@ const MyTickets = () => {
   const downloadTicket = async (t) => {
     const title = t.eventTitle || 'Event';
     const ticketId = t.ticketId || 'N/A';
-    const name = t.userName || '—';
-    const company = t.company || '—';
+    const name = t.userName || `${sessionStorage.getItem('firstName') || ''} ${sessionStorage.getItem('lastName') || ''}`.trim() || t.email || '—';
+    const company = t.company || sessionStorage.getItem('companyName') || '—';
     const qr = t.qrCode || '';
     const element = document.createElement('div');
     element.style.position = 'absolute';
@@ -120,10 +121,10 @@ const MyTickets = () => {
         <div style="display: flex; justify-content: center; margin: 30px 0;">
           ${qr ? `<img src="${qr}" alt="Ticket QR" style="width: 280px; height: 280px; border: 4px solid #e5e7eb; border-radius: 16px;" />` : '<p>No QR available</p>'}
         </div>
-        <p style="margin: 30px 0 8px 0; font-size: 13px; color: #888; letter-spacing: 0.5px; text-transform: uppercase;">Attendee Name</p>
-        <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${name}</p>
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #888; letter-spacing: 0.5px; text-transform: uppercase;">Company Name</p>
-        <p style="margin: 0; font-size: 14px; color: #666;">${company}</p>
+        <div style="margin-top: 30px;">
+          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1f2937;">${name}</p>
+          <p style="margin: 6px 0 0 0; font-size: 14px; color: #666;">${t.email || sessionStorage.getItem('email') || ''}</p>
+        </div>
       </div>
     </div>`;
     document.body.appendChild(element);
@@ -291,8 +292,8 @@ const MyTickets = () => {
               <tr>
                 <th>Event Title</th>
                 <th>Ticket ID</th>
-                <th>Name</th>
-                <th>Email</th>
+                <th>Organizer Name</th>
+                <th>Organizer Email</th>
                 <th>Date</th>
                 <th>Time</th>
                 <th>Status</th>
@@ -304,8 +305,8 @@ const MyTickets = () => {
                 <tr key={t.id}>
                   <td>{t.eventTitle || '—'}</td>
                   <td>{t.ticketId || '—'}</td>
-                  <td>{t.userName || '—'}</td>
-                  <td>{t.email || '—'}</td>
+                  <td>{t.organizerName || '—'}</td>
+                  <td>{t.organizerEmail || '—'}</td>
                   <td>{t.date ? new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                   <td>{t.time || '—'}</td>
                   <td><span className={`status-badge ${t.status || 'upcoming'}`}>{t.status || 'upcoming'}</span></td>
@@ -384,16 +385,8 @@ const TicketDetailsModal = ({ ticket, onClose }) => {
                 </div>
               )} */}
             </div>
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Attendee Name</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{ticket.userName || '—'}</p>
-              </div>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{ticket.email || '—'}</p>
-              </div>
+
               {ticket.company && (
                 <div>
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Company</p>
@@ -423,7 +416,6 @@ const TicketDetailsModal = ({ ticket, onClose }) => {
           </div>
           <div className="modal-actions" style={{ marginTop: '20px' }}>
             <button className="btn-secondary" onClick={onClose}>Close</button>
-            <button className="btn-primary" onClick={() => window.open(ticket.qrCode, '_blank')}>Download QR Code</button>
           </div>
         </div>
       </div>

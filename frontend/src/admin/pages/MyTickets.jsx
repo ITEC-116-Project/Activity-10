@@ -29,8 +29,8 @@ const MyTickets = () => {
   const downloadTicket = async (t) => {
     const title = t.eventTitle || 'Event';
     const ticketId = t.ticketId || 'N/A';
-    const name = t.userName || '—';
-    const company = t.company || '—';
+    const name = t.userName || `${sessionStorage.getItem('firstName') || ''} ${sessionStorage.getItem('lastName') || ''}`.trim() || t.email || '—';
+    const company = t.company || sessionStorage.getItem('companyName') || '—';
     const qr = t.qrCode || '';
     const element = document.createElement('div');
     element.style.position = 'absolute';
@@ -44,10 +44,10 @@ const MyTickets = () => {
         <div style="display: flex; justify-content: center; margin: 30px 0;">
           ${qr ? `<img src="${qr}" alt="Ticket QR" style="width: 280px; height: 280px; border: 4px solid #e5e7eb; border-radius: 16px;" />` : '<p>No QR available</p>'}
         </div>
-        <p style="margin: 30px 0 8px 0; font-size: 13px; color: #888; letter-spacing: 0.5px; text-transform: uppercase;">Attendee Name</p>
-        <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${name}</p>
-        <p style="margin: 0 0 8px 0; font-size: 13px; color: #888; letter-spacing: 0.5px; text-transform: uppercase;">Company Name</p>
-        <p style="margin: 0; font-size: 14px; color: #666;">${company}</p>
+        <div style="margin-top: 30px;">
+          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1f2937;">${name}</p>
+          <p style="margin: 6px 0 0 0; font-size: 14px; color: #666;">${t.email || sessionStorage.getItem('email') || ''}</p>
+        </div>
       </div>
     </div>`;
     document.body.appendChild(element);

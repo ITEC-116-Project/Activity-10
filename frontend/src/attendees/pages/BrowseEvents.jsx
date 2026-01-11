@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
-import { MdInfoOutline, MdHowToReg } from 'react-icons/md';
+import { MdInfoOutline, MdHowToReg, MdCheck } from 'react-icons/md';
 import Pagination from '../../components/Pagination';
 
 const BrowseEvents = () => {
@@ -34,6 +34,107 @@ const BrowseEvents = () => {
       setEvents([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [registeredEventIds, setRegisteredEventIds] = useState(new Set());
+
+  useEffect(() => {
+    // If user logged in, fetch their registrations so we can disable register button where appropriate
+    const token = sessionStorage.getItem('token');
+    const userId = sessionStorage.getItem('userId');
+    if (!token || !userId) return;
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    fetch(`${base}/events/attendee/${userId}/registrations`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => res.ok ? res.json() : Promise.resolve([]))
+      .then((data) => {
+        try {
+          const ids = new Set((data || []).map(r => Number(r.eventId)).filter(Boolean));
+          setRegisteredEventIds(ids);
+        } catch (err) {
+          console.error('Failed to parse registrations', err);
+        }
+      })
+      .catch(err => console.error('Error fetching registrations:', err));
+  }, []);
+
+  const handleRegisterClick = async (event) => {
+    const token = sessionStorage.getItem('token');
+    const userId = sessionStorage.getItem('userId');
+    if (!token || !userId) {
+      Swal.fire({ icon: 'error', title: 'Not logged in', text: 'Please log in to register for events.', confirmButtonColor: '#dc2626' });
+      return;
+    }
+
+    if (registeredEventIds.has(event.id)) {
+      Swal.fire({ icon: 'info', title: 'Already registered', text: 'You are already registered for this event.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    // Check if profile info is present in storage
+    const firstName = sessionStorage.getItem('firstName') || localStorage.getItem('firstName') || '';
+    const lastName = sessionStorage.getItem('lastName') || localStorage.getItem('lastName') || '';
+    const email = sessionStorage.getItem('email') || localStorage.getItem('email') || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (fullName && email) {
+      // Directly register without showing modal
+      const ticketId = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      try {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/events/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ eventId: event.id, attendeeId: Number(userId), attendeeName: fullName, ticketCode: ticketId })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          throw new Error(err?.message || 'Failed to register');
+        }
+
+        // Save to local storage for immediate UI feedback
+        const qrData = JSON.stringify({ ticketId, eventId: event.id, eventTitle: event.title, userName: fullName, email });
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+        const ticket = {
+          id: ticketId,
+          ticketId,
+          eventId: event.id,
+          eventTitle: event.title,
+          date: event.date,
+          time: event.time,
+          location: event.location,
+          status: event.status,
+          registeredAt: new Date().toISOString(),
+          userName: fullName,
+          email,
+          company: '',
+          qrCode: qrUrl
+        };
+        try {
+          const raw = localStorage.getItem('myTickets');
+          const tickets = raw ? JSON.parse(raw) : [];
+          tickets.push(ticket);
+          localStorage.setItem('myTickets', JSON.stringify(tickets));
+        } catch (err) {
+          console.error('Failed to persist ticket to localStorage', err);
+        }
+
+        // Update local state: mark event as registered and increment counts for immediate feedback
+        setRegisteredEventIds(prev => new Set(prev).add(event.id));
+        setEvents(prev => prev.map(ev => ev.id === event.id ? { ...ev, registered: (Number(ev.registered) || 0) + 1 } : ev));
+
+        Swal.fire({ icon: 'success', title: 'Registered!', text: 'You are now registered for the event.', confirmButtonColor: '#0f766e' });
+      } catch (err) {
+        console.error('Register error:', err);
+        Swal.fire({ icon: 'error', title: 'Registration Failed', text: err.message || 'Please try again.', confirmButtonColor: '#dc2626' });
+      }
+    } else {
+      // show modal to let user fill profile info and register
+      setSelectedEvent(event);
+      setStartRegister(true);
     }
   };
 
@@ -198,11 +299,13 @@ const BrowseEvents = () => {
                           <MdInfoOutline />
                         </button>
                         <button
-                          className="icon-btn primary"
-                          onClick={() => { setSelectedEvent(event); setStartRegister(true); }}
-                          aria-label="Register"
+                          className={`icon-btn ${registeredEventIds.has(event.id) ? 'neutral' : 'primary'}`}
+                          onClick={() => handleRegisterClick(event)}
+                          aria-label={registeredEventIds.has(event.id) ? 'Already registered' : 'Register'}
+                          disabled={registeredEventIds.has(event.id)}
+                          title={registeredEventIds.has(event.id) ? 'Already registered' : 'Register'}
                         >
-                          <MdHowToReg />
+                          {registeredEventIds.has(event.id) ? <MdCheck /> : <MdHowToReg />}
                         </button>
                       </div>
                     </td>
@@ -480,24 +583,12 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{event.createdByName || '—'}</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{`${event.createdByFirstName || ''} ${event.createdByLastName || ''}`.trim() || event.createdByName || '—'}</p>
               </div>
-              {event.createdByName && (
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer ID</p>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.createdBy || '—'}</p>
-                </div>
-              )}
-              {/* {event.staff && event.staff.length > 0 && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Staff</p>
-                  <div style={{ margin: '0', fontSize: '15px', color: '#333' }}>
-                    {event.staff.map((staffMember, idx) => (
-                      <p key={idx} style={{ margin: '4px 0', paddingLeft: '8px', borderLeft: '2px solid #d1fae5' }}>{staffMember}</p>
-                    ))}
-                  </div>
-                </div>
-              )} */}
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Organizer Email</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f766e' }}>{event.createdByEmail || '—'}</p>
+              </div>
             </div>
             <div className="modal-actions" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
               <button className="btn-secondary" onClick={onClose}>Close</button>
