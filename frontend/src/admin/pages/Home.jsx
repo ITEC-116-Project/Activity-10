@@ -356,7 +356,7 @@ const Home = ({ onRedirectToEdit }) => {
 };
 
 const EventDetailsModal = ({ event, onClose, onRedirectToEdit }) => {
-  const userName = localStorage.getItem('firstName') || 'Admin';
+  const userName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Admin';
   const [isRegistered, setIsRegistered] = useState(() => {
     try {
       const raw = localStorage.getItem('myTickets');

@@ -238,7 +238,7 @@ const BrowseEvents = () => {
 };
 
 const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
-  const userName = localStorage.getItem('firstName') || '';
+  const userName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '';
   const userEmail = localStorage.getItem('email') || '';
   const userCompany = localStorage.getItem('company') || '';
   

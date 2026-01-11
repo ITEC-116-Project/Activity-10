@@ -135,11 +135,6 @@ const Profile = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // First name, last name and email are intentionally read-only in the UI.
-    // We no longer block the update if they are empty here because they may
-    // be populated from server or localStorage; updates will still send the
-    // available editable fields (company, phone) to the server.
-
     const token = localStorage.getItem('token');
 
     if (token && userMeta.userId && userMeta.role) {
@@ -271,10 +266,8 @@ const Profile = () => {
       const ct = (r.headers.get('content-type') || '').toLowerCase();
 
       if (r.ok) {
-        // success: parse if there is JSON, otherwise proceed
         if (ct.includes('application/json')) {
           const body = await r.json();
-          // optional server message
         }
 
         setIsChangingPassword(false);
@@ -285,7 +278,6 @@ const Profile = () => {
         return;
       }
 
-      // non-OK response, try to extract message and include status
       let errMsg = '';
       if (ct.includes('application/json')) {
         const body = await r.json();

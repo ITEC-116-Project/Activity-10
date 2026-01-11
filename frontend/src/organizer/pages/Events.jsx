@@ -197,7 +197,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           status: (new Date() < start) ? 'upcoming' : ((new Date() >= start && new Date() <= end) ? 'ongoing' : 'completed'),
           description: newEvent.description || '',
           createdBy: localStorage.getItem('userId') || '1',
-          createdByName: localStorage.getItem('firstName') || ''
+          createdByName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''
         };
 
         const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -258,7 +258,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
       {authService.getRole() === 'organizer' && (
         <div style={{ margin: '12px 0 20px 0', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#065f46', borderRadius: 6 }}>
-          Showing events created by <strong>{localStorage.getItem('firstName') || 'you'}</strong> only. Use <strong>+ Add New Event</strong> to create more.
+          Showing events created by <strong>{localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'you'}</strong> only. Use <strong>+ Add New Event</strong> to create more.
         </div>
       )}
 

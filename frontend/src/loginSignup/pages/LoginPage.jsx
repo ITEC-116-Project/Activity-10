@@ -11,7 +11,6 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [remember, setRemember] = useState(true); // keep logged in by default
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
@@ -77,14 +76,16 @@ const LoginPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Store token and user info in chosen storage
-        const chosenStorage = remember ? localStorage : sessionStorage;
-        chosenStorage.setItem('token', data.token);
-        chosenStorage.setItem('userRole', data.role);
-        chosenStorage.setItem('userId', data.userId);
-        chosenStorage.setItem('username', data.username);
-        chosenStorage.setItem('firstName', data.firstName);
-        chosenStorage.setItem('lastName', data.lastName);
+        // Clear both storages to avoid conflicts with old data and store session-only values
+        localStorage.clear();
+        sessionStorage.clear();
+
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('userRole', data.role);
+        sessionStorage.setItem('userId', data.userId);
+        sessionStorage.setItem('username', data.username);
+        sessionStorage.setItem('firstName', data.firstName);
+        sessionStorage.setItem('lastName', data.lastName);
 
         // Navigate based on role
         switch (data.role) {
@@ -162,15 +163,7 @@ const LoginPage = () => {
               )}
             </div>
           </div>
-          <div className="form-group remember-me">
-            <input
-              type="checkbox"
-              id="remember"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            <label htmlFor="remember">Remember me</label>
-          </div>
+
           {error && <div className="error-message">{error}</div>}
           <button type="submit" className="login-button" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}

@@ -8,6 +8,7 @@ import Home from './Home.jsx';
 import Events from './Events.jsx';
 import MyTickets from './MyTickets.jsx';
 import Reports from './Reports.jsx';
+import Profile from './Profile.jsx';
 
 const OrganizerDashboard = () => {
   const navigate = useNavigate();
@@ -83,6 +84,8 @@ const OrganizerDashboard = () => {
         return <Events initialEventToEdit={selectedEventForEdit} onClearEditEvent={() => setSelectedEventForEdit(null)} onViewActiveEvent={handleViewActiveEvent} />;
       case 'mytickets':
         return <MyTickets />;
+      case 'profile':
+        return <Profile />;
       case 'reports':
         return <Reports />;
       default:
@@ -93,7 +96,7 @@ const OrganizerDashboard = () => {
   return (
     <div className="organizer-dashboard">
       <div className="dashboard-header">
-        <h1>Organizer Dashboard</h1>
+        <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
           <button onClick={handleLogout} className="logout-button">Logout</button>

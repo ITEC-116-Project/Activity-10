@@ -68,7 +68,7 @@ const AttendeesDashboard = () => {
   return (
     <div className="attendees-dashboard">
       <div className="dashboard-header">
-        <h1>Attendees Dashboard</h1>
+        <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
           <button onClick={handleLogout} className="logout-button">Logout</button>

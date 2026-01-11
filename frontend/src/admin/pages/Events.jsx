@@ -473,7 +473,7 @@ const CreateEventModal = ({ onClose }) => {
 };
 
 const EventDetailsModal = ({ event, onClose }) => {
-  const userName = localStorage.getItem('firstName') || 'Admin';
+  const userName = localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || 'Admin';
   const [isRegistered, setIsRegistered] = useState(() => {
     try {
       const raw = localStorage.getItem('myTickets');

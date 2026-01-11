@@ -1,5 +1,5 @@
 import React from 'react';
-import { MdHome, MdEvent, MdPeople, MdAssessment, MdConfirmationNumber } from 'react-icons/md';
+import { MdHome, MdEvent, MdPeople, MdAssessment, MdConfirmationNumber, MdPerson } from 'react-icons/md';
 
 const SideNav = ({ activeSection, onChange }) => {
   return (
@@ -32,6 +32,13 @@ const SideNav = ({ activeSection, onChange }) => {
         >
           <MdPeople className="icon" />
           <span>Manage Users</span>
+        </button>
+        <button
+          className={`nav-item ${activeSection === 'profile' ? 'active' : ''}`}
+          onClick={() => onChange('profile')}
+        >
+          <MdPerson className="icon" />
+          <span>Profile</span>
         </button>
         <button
           className={`nav-item ${activeSection === 'reports' ? 'active' : ''}`}
