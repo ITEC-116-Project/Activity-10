@@ -202,4 +202,37 @@ export class EmailService {
       this.logger.error('Failed to send registration attachment', err as any);
     }
   }
+
+  async sendAccountCreationEmail(recipientEmail: string, temporaryPassword: string, fullName: string | undefined, role?: string) {
+    if (!this.transporter) {
+      this.logger.warn('Transporter not configured, skipping sendAccountCreationEmail');
+      return;
+    }
+    try {
+      const to = recipientEmail;
+      const subject = `Your account has been created`;
+      const displayName = fullName || 'User';
+      const roleLabel = role ? ` (${role})` : '';
+
+      const html = `
+        <div style="font-family: Arial, Helvetica, sans-serif; color: #111">
+          <p>Dear ${displayName},</p>
+          <p>We have created an account for you${roleLabel} on our event platform. Below are your temporary sign-in details. For security, please change your password immediately after signing in.</p>
+          <p style="background:#f8fafc;padding:12px;border-radius:8px;display:inline-block;color:#0f172a"><strong>Username / Email:</strong> ${recipientEmail}<br/><strong>Temporary Password:</strong> ${temporaryPassword}</p>
+          <p style="margin-top:12px">To sign in, visit: <a href="${process.env.FRONTEND_URL || 'http://localhost:5173' }">${process.env.FRONTEND_URL || 'http://localhost:5173'}</a></p>
+          <p style="color:#666;font-size:12px">If you did not request this account, please contact the administrator.</p>
+        </div>
+      `;
+
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER || 'no-reply@example.com',
+        to,
+        subject,
+        html,
+      });
+      this.logger.log(`Sent account creation email to ${to}`);
+    } catch (err) {
+      this.logger.error('Failed to send account creation email', err as any);
+    }
+  }
 }

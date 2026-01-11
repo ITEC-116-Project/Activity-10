@@ -54,6 +54,8 @@ export class AccountLoginService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const requiresPasswordChange = !!user.temporaryPassword;
+
     // Activate user if currently inactive (for organizer and attendees)
     if (role !== 'admin' && user.isActive === false) {
       user.isActive = true;
@@ -82,6 +84,7 @@ export class AccountLoginService {
       firstName: user.firstName,
       lastName: user.lastName,
       isActive: user.isActive ?? undefined,
+      requiresPasswordChange: requiresPasswordChange,
     };
   }
 
@@ -212,10 +215,18 @@ export class AccountLoginService {
       throw new UnauthorizedException('User not found');
     }
 
-    const isValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isValid) {
-      console.log('[changePassword] invalid current password for userId:', userId);
-      throw new UnauthorizedException('Current password is incorrect');
+    // Allow changing password without currentPassword when the account is using a temporary password
+    let isValid = false;
+    if (user.temporaryPassword && (!currentPassword || currentPassword.trim() === '')) {
+      // user authenticated with token and account is flagged temporary - allow change
+      isValid = true;
+      console.log('[changePassword] accepting change using temporary password flag for userId:', userId);
+    } else {
+      isValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isValid) {
+        console.log('[changePassword] invalid current password for userId:', userId);
+        throw new UnauthorizedException('Current password is incorrect');
+      }
     }
 
     if (newPassword.length < 8) {
@@ -226,12 +237,16 @@ export class AccountLoginService {
     const hashed = await bcrypt.hash(newPassword, 10);
     user.password = hashed;
 
-    await repo.save(user);
+  // clear temporary password flag when password is changed
+  user.temporaryPassword = false;
+
+  await repo.save(user);
 
     // update global users table if present
     const globalUser = await this.usersRepository.findOne({ where: { email: user.email } });
     if (globalUser) {
       globalUser.password = hashed;
+      globalUser.temporaryPassword = false;
       await this.usersRepository.save(globalUser);
     }
 

@@ -5,6 +5,8 @@ import * as bcrypt from 'bcrypt';
 import { Admin } from '../../typeorm/entities/admin';
 import { Organizer } from '../../typeorm/entities/organizer';
 import { Attendees } from '../../typeorm/entities/attendees';
+import { Users } from '../../typeorm/entities/users';
+import { EmailService } from '../email/email.service';
 import { AccountRole, CreateManageAccountDto, UpdateManageAccountDto } from './dto/manage-account.dto';
 
 type AccountEntity = Admin | Organizer | Attendees;
@@ -15,7 +17,9 @@ export class ManageAccountService {
     @InjectRepository(Admin) private readonly adminRepository: Repository<Admin>,
     @InjectRepository(Organizer) private readonly organizerRepository: Repository<Organizer>,
     @InjectRepository(Attendees) private readonly attendeesRepository: Repository<Attendees>,
+    @InjectRepository(Users) private readonly usersRepository: Repository<Users>,
     private readonly dataSource: DataSource,
+    private readonly emailService: EmailService,
   ) {}
 
   async findAll() {
@@ -123,11 +127,42 @@ export class ManageAccountService {
       // save into role table using the manager
       let saved = await queryRunner.manager.save(created as any);
 
+      // also persist into global users table for reference
+      try {
+        const u = this.usersRepository.create({
+          email: saved.email,
+          username: saved.username,
+          password: (saved.password as string) || hashedPassword,
+          role,
+          firstName: saved.firstName,
+          lastName: saved.lastName,
+          temporaryPassword: !dto.password,
+        });
+        await queryRunner.manager.save(u as any);
+      } catch (err) {
+        // non-fatal: continue even if users table save fails
+        console.warn('Failed to save to users table', err);
+      }
+
       await queryRunner.commitTransaction();
 
       const safe = this.toSafeAccount(saved, role) as any;
       if (!dto.password) {
         safe.temporaryPassword = rawPassword; // surface only when auto-generated
+        // mark the saved account as temporary so login flow can require a password change
+        (saved as any).temporaryPassword = true;
+        try {
+          await queryRunner.manager.save(saved as any);
+        } catch (err) {
+          console.warn('Failed to mark temporaryPassword on saved account', err);
+        }
+
+        // send welcome email with temporary password (non-blocking)
+        try {
+          await this.emailService.sendAccountCreationEmail(saved.email, rawPassword, `${saved.firstName || ''} ${saved.lastName || ''}`.trim(), role);
+        } catch (err) {
+          console.warn('Failed to send account creation email', err);
+        }
       }
 
       return safe;

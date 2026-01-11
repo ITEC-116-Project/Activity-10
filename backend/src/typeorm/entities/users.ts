@@ -20,6 +20,9 @@ export class Users {
   @Column()
   password: string;
 
+  @Column({ type: 'boolean', default: false })
+  temporaryPassword: boolean;
+
   @Column({ 
     type: 'enum', 
     enum: ['admin', 'organizer', 'attendees'],

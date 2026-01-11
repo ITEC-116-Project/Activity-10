@@ -55,6 +55,25 @@ export const authService = {
     return response.json();
   },
 
+  async changePassword(currentPassword, newPassword) {
+    const token = this.getToken();
+    const response = await fetch(`${API_URL}/account-login/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Change password failed');
+    }
+
+    return response.json();
+  },
+
   logout() {
     localStorage.clear();
     sessionStorage.clear();

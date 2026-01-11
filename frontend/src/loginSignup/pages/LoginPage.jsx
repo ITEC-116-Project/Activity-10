@@ -12,6 +12,12 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [changeCurrentPassword, setChangeCurrentPassword] = useState('');
+  const [changeNewPassword, setChangeNewPassword] = useState('');
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState('');
+  const [changeLoading, setChangeLoading] = useState(false);
+  const [changeError, setChangeError] = useState('');
   const navigate = useNavigate();
 
   // If already have a token in localStorage or sessionStorage, validate and redirect
@@ -93,7 +99,12 @@ const LoginPage = () => {
 
         console.log('[LoginPage] Storage set - userRole:', sessionStorage.getItem('userRole'));
 
-        // Navigate based on role
+        // If the account requires password change (temporary password), mark it and navigate first
+        if (data.requiresPasswordChange) {
+          try { sessionStorage.setItem('requiresPasswordChange', '1'); sessionStorage.setItem('tempPassword', formData.password); } catch {}
+        }
+
+        // Navigate based on role (user is now logged in)
         switch (data.role) {
           case 'admin':
             navigate('/admin/dashboard');
@@ -118,8 +129,47 @@ const LoginPage = () => {
     }
   };
 
+  const submitChangePassword = async (e) => {
+    e.preventDefault();
+    setChangeError('');
+    if (!changeNewPassword || changeNewPassword.length < 8) {
+      setChangeError('New password must be at least 8 characters long');
+      return;
+    }
+    if (changeNewPassword !== changeConfirmPassword) {
+      setChangeError('New password and confirmation do not match');
+      return;
+    }
+
+    try {
+      setChangeLoading(true);
+      await authService.changePassword(changeCurrentPassword, changeNewPassword);
+      setShowChangeModal(false);
+      // After password changed, navigate to dashboard
+      const role = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+      switch (role) {
+        case 'admin':
+          navigate('/admin/dashboard');
+          break;
+        case 'organizer':
+          navigate('/organizer/dashboard');
+          break;
+        case 'attendees':
+          navigate('/attendees/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    } catch (err) {
+      setChangeError(err?.message || 'Failed to change password');
+    } finally {
+      setChangeLoading(false);
+    }
+  };
+
   return (
-    <div className="login-container">
+    <>
+      <div className="login-container">
       <div className="login-card">
         <h2>Login</h2>
         <form onSubmit={handleSubmit}>
@@ -180,6 +230,34 @@ const LoginPage = () => {
         </div>
       </div>
     </div>
+        {/* Change Password Modal */}
+        {showChangeModal && (
+          <div className="modal-overlay" onClick={() => setShowChangeModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2>Change Password</h2>
+              <form onSubmit={submitChangePassword}>
+                <div className="form-group">
+                  <label>Current Temporary Password</label>
+                  <input type="password" value={changeCurrentPassword} onChange={(e) => setChangeCurrentPassword(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label>New Password</label>
+                  <input type="password" value={changeNewPassword} onChange={(e) => setChangeNewPassword(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label>Confirm New Password</label>
+                  <input type="password" value={changeConfirmPassword} onChange={(e) => setChangeConfirmPassword(e.target.value)} required />
+                </div>
+                {changeError && <div className="error-message">{changeError}</div>}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowChangeModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={changeLoading}>{changeLoading ? 'Changing...' : 'Change Password'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+  )}
+    </>
   );
 };
 
