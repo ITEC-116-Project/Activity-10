@@ -154,5 +154,14 @@ export class EventService {
     // Delete registration
     await this.eventAttendeesRepo.delete(registrationId);
   }
+
+  async checkInRegistration(registrationId: number) {
+    const registration = await this.eventAttendeesRepo.findOne({ where: { id: registrationId } });
+    if (!registration) {
+      throw new NotFoundException('Registration not found');
+    }
+    registration.status = 'active';
+    return this.eventAttendeesRepo.save(registration);
+  }
 }
 

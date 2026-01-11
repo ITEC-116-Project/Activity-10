@@ -41,4 +41,22 @@ export class ManageAccountController {
   remove(@Param('role') role: string, @Param('id', ParseIntPipe) id: number) {
     return this.manageAccountService.remove(role, id);
   }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get active counts for organizers and attendees' })
+  getActiveCounts() {
+    return this.manageAccountService.getActiveCounts();
+  }
+
+  @Get('attendees/active')
+  @ApiOperation({ summary: 'List active attendees only' })
+  getActiveAttendeesList() {
+    return this.manageAccountService.getActiveAttendeesList();
+  }
+
+  @Get('organizers/active')
+  @ApiOperation({ summary: 'List active organizers only' })
+  getActiveOrganizersList() {
+    return this.manageAccountService.getActiveOrganizersList();
+  }
 }

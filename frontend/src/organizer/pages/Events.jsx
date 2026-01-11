@@ -25,7 +25,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       return '';
     }
   });
-  const [filterStatus, setFilterStatus] = useState('all');
+  // status filter removed per request
   const loadInitialEvents = () => {
     try {
       const raw = localStorage.getItem('events');
@@ -124,10 +124,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
     }
   };
 
-  const handleFilterChange = (value) => {
-    setFilterStatus(value);
-    setCurrentPage(1);
-  };
+  // status filter handler removed
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
@@ -146,9 +143,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
   const filteredEvents = visibleEvents.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const derived = deriveStatusKey(event);
-    const matchesFilter = filterStatus === 'all' ? true : derived === filterStatus;
-    return matchesSearch && matchesFilter;
+    return matchesSearch;
   });
 
   const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(deriveStatusKey(a)) - rankStatus(deriveStatusKey(b)));
@@ -247,12 +242,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           value={searchTerm}
           onChange={(e) => handleSearchChange(e.target.value)}
         />
-        <select value={filterStatus} onChange={(e) => handleFilterChange(e.target.value)}>
-          <option value="all">All Status</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="ongoing">Ongoing</option>
-          <option value="past">Past</option>
-        </select>
+        {/* Status filter removed */}
         <select value={viewMode} onChange={(e) => handleViewModeChange(e.target.value)} className="view-mode-select">
           <option value="card">⊞ Cards</option>
           <option value="table">≡ Table</option>
@@ -283,7 +273,6 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           <div key={event.id} className="event-card">
             <div className="event-header">
               <h4>{event.title}</h4>
-              <span className={`status-badge ${deriveStatusKey(event)}`}>{displayStatusLabel(event)}</span>
             </div>
             <div className="event-details">
               <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -324,7 +313,6 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
               <th>Time</th>
               <th>Location</th>
               <th>Capacity</th>
-              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -336,7 +324,6 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
                 <td>{event.time}</td>
                 <td>{event.location}</td>
                 <td>{event.registered} / {event.capacity}</td>
-                <td><span className={`status-badge ${deriveStatusKey(event)}`}>{displayStatusLabel(event)}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   {deriveStatusKey(event) === 'ongoing' ? (
                     <button className="btn-primary" onClick={() => onViewActiveEvent && onViewActiveEvent(event)} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
@@ -388,8 +375,7 @@ const EditEventModal = ({ event, onClose }) => {
     time: event.time || '',
     location: event.location || '',
     capacity: event.capacity || '',
-    category: event.category || '',
-    status: event.status || 'upcoming'
+    category: event.category || ''
   });
 
   const handleSubmit = (e) => {
@@ -478,17 +464,7 @@ const EditEventModal = ({ event, onClose }) => {
               </select>
             </div>
           </div>
-          <div className="form-group">
-            <label>Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="past">Past</option>
-            </select>
-          </div>
+          {/* Status removed from edit form per request */}
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary">Save Changes</button>

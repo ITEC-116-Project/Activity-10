@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { deriveStatusKey } from '../../shared/utils/eventStatus';
 import Swal from 'sweetalert2';
+import { authService } from '../../shared/services/authService';
 import Pagination from '../../components/Pagination';
 
 // Add jsQR library dynamically
@@ -409,69 +410,137 @@ const MyTickets = () => {
     scanIntervalRef.current = requestAnimationFrame(scanFrame);
   };
 
-  const handleQRScanned = (qrData) => {
+  const handleQRScanned = async (qrData) => {
     console.log('Raw QR data:', qrData);
     
     // Immediately pause scanning to prevent multiple detections
     setIsScanningPaused(true);
     
-    try {
-      // Try to parse as JSON (the QR contains the full ticket object)
-      let scannedData;
       try {
-        scannedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
-      } catch {
-        // If not JSON, treat as plain string
-        scannedData = { ticketId: qrData };
-      }
-      
-      // Check if this attendee is in our valid list
-      const validAttendee = validAttendees.find(a => a.ticketId === scannedData.ticketId);
-      
-      if (validAttendee) {
-        console.log('Valid attendee found:', validAttendee);
-        
-        if (lastScannedCode !== qrData) {
-          setLastScannedCode(qrData);
-          setScannedAttendee(validAttendee); // Show modal for valid attendees
-          // Auto mark checked-in if present in participants list
-          const matched = participants.find(p => p.ticketId === validAttendee.ticketId);
-          if (matched && !checkedInParticipants.has(matched.id)) {
-            setCheckedInParticipants(prev => new Set([...prev, matched.id]));
-          }
-          
-          // Also show success alert
-          Swal.fire({
-            icon: 'success',
-            title: 'QR Code Detected!',
-            text: `Welcome ${validAttendee.userName}! ✓ Checked In`,
-            confirmButtonColor: '#0f766e',
-            confirmButtonText: 'OK',
-            timer: 3000,
-            timerProgressBar: true
-          }).then(() => {
-            // Resume scanning when alert is closed
-            setIsScanningPaused(false);
-            setLastScannedCode(null);
-          });
-        } else {
-          // Same code scanned again, just resume
-          setIsScanningPaused(false);
+        // Try to parse as JSON (the QR contains the full ticket object)
+        let scannedData;
+        try {
+          scannedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+        } catch {
+          // If not JSON, treat as plain string
+          scannedData = { ticketId: qrData };
         }
-      } else {
+
+        // Normalize common ticket fields (ticketId, ticketCode, ticket)
+        const ticketCode = (scannedData && (scannedData.ticketId || scannedData.ticketCode || scannedData.ticket || scannedData.code || scannedData.ticket_code)) || (typeof scannedData === 'string' ? scannedData : null);
+
+        // If the QR is for a different event, warn and ignore
+        if (scannedData && scannedData.eventId && activeEvent && String(scannedData.eventId) !== String(activeEvent.id)) {
+          Swal.fire({ icon: 'warning', title: 'Wrong Event', text: 'This ticket is for a different event.', confirmButtonColor: '#0f766e' }).then(() => setIsScanningPaused(false));
+          return;
+        }
+
+        // Try to find a participant record in the current list first
+        let matched = ticketCode ? participants.find(p => p.ticketId === ticketCode) : null;
+
+        // helper to show success and mark checked-in where possible
+        const handleSuccess = (person, displayName) => {
+          if (lastScannedCode !== qrData) {
+            setLastScannedCode(qrData);
+            setScannedAttendee(person || { id: null, userName: displayName || 'Attendee', ticketId: ticketCode });
+            if (person && person.id && !checkedInParticipants.has(person.id)) {
+              setCheckedInParticipants(prev => new Set([...prev, person.id]));
+            }
+            // stop camera and scanning when attendee details and alert are shown
+            try { stopCamera(); } catch (e) { /* ignore */ }
+            // Persist check-in to server if we have a registration id
+            (async () => {
+              if (person && person.id) {
+                const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                try {
+                  const token = authService.getToken();
+                  const res = await fetch(`${base}/events/${person.id}/check-in`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    }
+                  });
+                  if (!res.ok) {
+                    // revert UI change
+                    setCheckedInParticipants(prev => {
+                      const next = new Set(prev);
+                      next.delete(person.id);
+                      return next;
+                    });
+                    const txt = await res.text();
+                    console.error('Failed to persist check-in', txt);
+                    if (res.status === 401) {
+                      Swal.fire({ icon: 'warning', title: 'Unauthorized', text: 'Please login to persist check-ins.', confirmButtonColor: '#0f766e' }).then(() => {
+                        try { window.location.href = '/login'; } catch {}
+                      });
+                    } else {
+                      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not persist check-in to server', confirmButtonColor: '#ef4444' });
+                    }
+                  }
+                } catch (err) {
+                  // revert UI change
+                  setCheckedInParticipants(prev => {
+                    const next = new Set(prev);
+                    next.delete(person.id);
+                    return next;
+                  });
+                  console.error('Check-in request failed', err);
+                  Swal.fire({ icon: 'error', title: 'Error', text: 'Could not persist check-in to server', confirmButtonColor: '#ef4444' });
+                }
+              }
+              Swal.fire({ icon: 'success', title: 'QR Code Detected!', text: `Welcome ${displayName || (person && person.userName) || 'Attendee'}! ✓ Checked In`, confirmButtonColor: '#0f766e', confirmButtonText: 'OK', timer: 3000, timerProgressBar: true }).then(() => {
+                // keep scanning paused and camera stopped; clear last code so next manual start works cleanly
+                setLastScannedCode(null);
+              });
+            })();
+          } else {
+            setIsScanningPaused(false);
+          }
+        };
+
+        // If not found in current participants, try refreshing from server (if activeEvent exists)
+        if (!matched && activeEvent && activeEvent.id && ticketCode) {
+          try {
+            const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const res = await fetch(`${base}/events/${activeEvent.id}/attendees`);
+            if (res.ok) {
+              const data = await res.json();
+              const list = Array.isArray(data) ? data : [];
+              const mapped = list.map(a => ({
+                id: a.id,
+                userName: a.attendeeName || (a.attendee && (a.attendee.firstName ? `${a.attendee.firstName} ${a.attendee.lastName}` : a.attendee.username)) || 'Attendee',
+                email: (a.attendee && a.attendee.email) || (a.admin && a.admin.email) || '',
+                ticketId: a.ticketCode,
+                registeredAt: a.registeredAt,
+                status: a.status
+              }));
+              setParticipants(mapped);
+              const initialChecked = new Set(list.filter(x => x.status && x.status !== 'inactive').map(x => x.id));
+              setCheckedInParticipants(initialChecked);
+              matched = mapped.find(p => p.ticketId === ticketCode) || null;
+            }
+          } catch (err) {
+            console.error('Failed to refresh participants during scan', err);
+          }
+        }
+
+        // If found in participants, success
+        if (matched) {
+          handleSuccess(matched, matched.userName);
+          return;
+        }
+
+        // fallback: check static list
+        const validAttendee = ticketCode ? validAttendees.find(a => a.ticketId === ticketCode) : null;
+        if (validAttendee) {
+          handleSuccess({ id: null, userName: validAttendee.userName, email: validAttendee.email, ticketId: validAttendee.ticketId }, validAttendee.userName);
+          return;
+        }
+
+        // Not found anywhere
         console.log('Attendee not found for QR code:', qrData);
-        Swal.fire({
-          icon: 'error',
-          title: 'Invalid QR Code',
-          text: 'Attendee not found',
-          confirmButtonColor: '#dc2626',
-          timer: 3000,
-          timerProgressBar: true
-        }).then(() => {
-          // Resume scanning after error alert
-          setIsScanningPaused(false);
-        });
-      }
+        Swal.fire({ icon: 'error', title: 'Invalid QR Code', text: 'Attendee not found', confirmButtonColor: '#dc2626', timer: 3000, timerProgressBar: true }).then(() => setIsScanningPaused(false));
     } catch (error) {
       console.error('Error processing QR code:', error);
       setIsScanningPaused(false);
@@ -778,7 +847,7 @@ const MyTickets = () => {
       <p style={{ margin: 0 }}>There is no ongoing event at the moment.</p>
       <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
         <button className="btn-primary" onClick={fetchActiveEvent}>Refresh</button>
-        <button className="btn-secondary" onClick={() => { try { window.location.href = '/events'; } catch {} }}>Go to Events</button>
+  <button className="btn-secondary" onClick={() => { try { window.location.href = '/organizer/dashboard'; } catch {} }}>Go to Events</button>
       </div>
     </div>
   )}

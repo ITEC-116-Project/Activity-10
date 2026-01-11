@@ -329,15 +329,47 @@ const Home = ({ onRedirectToEdit, onViewActiveEvent, onCreateEvent, redirectToEv
 // CreateEventModal moved to organizer/components/CreateEventModal.jsx
 
 const ParticipantsModal = ({ event, onClose }) => {
-  const [participants, setParticipants] = useState(() => {
+  const [participants, setParticipants] = useState([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsError, setParticipantsError] = useState(null);
+
+  const fetchParticipants = async () => {
+    setParticipantsLoading(true);
+    setParticipantsError(null);
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.filter(t => t.eventId === event.id);
-    } catch {
-      return [];
+      const res = await fetch(`${base}/events/${event.id}/attendees`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      const mapped = list.map(a => ({
+        id: a.id,
+        userName: a.attendeeName || (a.attendee && (a.attendee.firstName ? `${a.attendee.firstName} ${a.attendee.lastName}` : a.attendee.username)) || 'Attendee',
+        email: (a.attendee && a.attendee.email) || (a.admin && a.admin.email) || '',
+        ticketId: a.ticketCode,
+        registeredAt: a.registeredAt,
+        status: a.status
+      }));
+      setParticipants(mapped);
+      setCheckedInParticipants(new Set(list.filter(x => x.status && x.status !== 'inactive').map(x => x.id)));
+    } catch (err) {
+      console.error('Failed to load participants', err);
+      setParticipantsError(err.message || 'Failed to load participants');
+      try {
+        const raw = localStorage.getItem('myTickets');
+        const tickets = raw ? JSON.parse(raw) : [];
+        setParticipants(tickets.filter(t => t.eventId === event.id));
+      } catch {
+        setParticipants([]);
+      }
+    } finally {
+      setParticipantsLoading(false);
     }
-  });
+  };
+
+  useEffect(() => {
+    fetchParticipants();
+  }, [event.id]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -449,6 +481,15 @@ const ParticipantsModal = ({ event, onClose }) => {
             >
               <MdFileDownload /> PDF
             </button>
+              <button
+                className="btn-secondary"
+                onClick={fetchParticipants}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                disabled={participantsLoading}
+                title="Refresh participants"
+              >
+                ↻ {participantsLoading ? 'Loading...' : 'Refresh'}
+              </button>
           </div>
 
           {scannerOpen && (
@@ -463,6 +504,13 @@ const ParticipantsModal = ({ event, onClose }) => {
               <p style={{ margin: '0', fontSize: '13px', color: '#666' }}>Click on a participant's QR code to simulate scanning, or use device camera.</p>
               <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>Note: Enable camera access when prompted by your browser.</p>
             </div>
+          )}
+
+          {participantsLoading && (
+            <div style={{ padding: '10px 0', color: '#666' }}>Loading participants...</div>
+          )}
+          {participantsError && (
+            <div style={{ padding: '10px 0', color: '#b91c1c' }}>Error loading participants: {participantsError}</div>
           )}
 
           <div className="events-table-container">
