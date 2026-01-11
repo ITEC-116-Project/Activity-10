@@ -117,5 +117,21 @@ export class EventService {
     });
     return !!registration;
   }
+
+  async cancelRegistration(registrationId: number): Promise<void> {
+    const registration = await this.eventAttendeesRepo.findOne({
+      where: { id: registrationId }
+    });
+
+    if (!registration) {
+      throw new NotFoundException('Registration not found');
+    }
+
+    // Decrement event registered count
+    await this.eventRepo.decrement({ id: registration.eventId }, 'registered', 1);
+
+    // Delete registration
+    await this.eventAttendeesRepo.delete(registrationId);
+  }
 }
 

@@ -4,17 +4,93 @@ import Pagination from '../../components/Pagination';
 
 const MyTickets = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [tickets, setTickets] = useState(() => {
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
+  const [userMeta, setUserMeta] = useState({ userId: null, role: null });
+
+  // Fetch registrations from backend on mount
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        const token = sessionStorage.getItem('token');
+        if (!token) {
+          setTickets([]);
+          return;
+        }
+
+        // Get current user info
+        const validateResponse = await fetch('http://localhost:3000/account-login/validate', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!validateResponse.ok) throw new Error('Failed to validate user');
+        
+        const { userId, role } = await validateResponse.json();
+        setUserMeta({ userId, role });
+
+        // Fetch event registrations
+        const registrationsResponse = await fetch(`http://localhost:3000/events/attendee/${userId}/registrations`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!registrationsResponse.ok) throw new Error('Failed to fetch registrations');
+        
+        const registrations = await registrationsResponse.json();
+
+        // Fetch events to get event details
+        const eventsResponse = await fetch('http://localhost:3000/events');
+        if (!eventsResponse.ok) throw new Error('Failed to fetch events');
+        const events = await eventsResponse.json();
+
+        // Combine registration and event data
+        const ticketsWithQR = registrations.map(reg => {
+          const event = events.find(e => e.id === reg.eventId);
+          const qrData = JSON.stringify({
+            ticketCode: reg.ticketCode,
+            eventId: reg.eventId,
+            eventTitle: event?.title || 'Event',
+            attendeeName: reg.attendeeName,
+            registeredAt: reg.registeredAt
+          });
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+
+          return {
+            id: reg.id,
+            ticketId: reg.ticketCode,
+            ticketCode: reg.ticketCode,
+            eventId: reg.eventId,
+            eventTitle: event?.title || 'Event',
+            date: event?.date || '',
+            time: event?.time || '',
+            location: event?.location || '',
+            status: event?.status || 'upcoming',
+            registeredAt: reg.registeredAt,
+            userName: reg.attendeeName,
+            email: '',
+            company: '',
+            qrCode: qrUrl
+          };
+        });
+
+        setTickets(ticketsWithQR);
+      } catch (err) {
+        console.error('Error fetching tickets:', err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to load your tickets',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#0f766e'
+        });
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
+  }, []);
 
   const itemsPerPage = viewMode === 'card' ? 5 : 10;
   const totalPages = Math.ceil(tickets.length / itemsPerPage);
@@ -81,21 +157,6 @@ const MyTickets = () => {
     }
   };
 
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === 'myTickets') {
-        try {
-          const parsed = e.newValue ? JSON.parse(e.newValue) : [];
-          setTickets(Array.isArray(parsed) ? parsed : []);
-        } catch {
-          setTickets([]);
-        }
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-
   const handleCancelRegistration = (ticketId) => {
     Swal.fire({
       icon: 'warning',
@@ -105,12 +166,39 @@ const MyTickets = () => {
       confirmButtonColor: '#dc2626',
       showCancelButton: true,
       cancelButtonText: 'No, Keep It'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          const token = sessionStorage.getItem('token');
+          if (!token) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'You must be logged in to cancel registration',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#dc2626'
+            });
+            return;
+          }
+
+          // Call backend to delete registration
+          const response = await fetch(`http://localhost:3000/events/${ticketId}/cancel`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to cancel registration');
+          }
+
+          // Remove from local state
           const updatedTickets = tickets.filter(t => t.id !== ticketId);
-          localStorage.setItem('myTickets', JSON.stringify(updatedTickets));
           setTickets(updatedTickets);
+
           Swal.fire({
             icon: 'success',
             title: 'Cancelled!',
@@ -122,7 +210,7 @@ const MyTickets = () => {
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Failed to cancel registration. Please try again.',
+            text: err.message || 'Failed to cancel registration. Please try again.',
             confirmButtonText: 'OK',
             confirmButtonColor: '#dc2626'
           });
@@ -140,11 +228,20 @@ const MyTickets = () => {
           <option value="table">≡ Table</option>
         </select>
       </div>
-      {tickets.length === 0 ? (
+      
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '40px', fontSize: '16px', color: '#666' }}>
+          <p>Loading your tickets...</p>
+        </div>
+      )}
+
+      {!loading && tickets.length === 0 && (
         <div className="empty-state">
           <p>No tickets yet. Register to an event to see it here.</p>
         </div>
-      ) : viewMode === 'card' ? (
+      )}
+
+      {!loading && tickets.length > 0 && (viewMode === 'card' ? (
         <>
         <div className="events-grid">
           {currentTickets.map((t) => (
@@ -236,7 +333,7 @@ const MyTickets = () => {
           />
         )}
         </>
-      )}
+      ))}
       {selectedTicket && (
         <TicketDetailsModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
       )}

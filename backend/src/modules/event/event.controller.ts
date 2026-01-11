@@ -57,4 +57,13 @@ export class EventController {
     const isRegistered = await this.svc.isAttendeeRegistered(Number(eventId), Number(attendeeId));
     return { isRegistered };
   }
+
+  @Post(':registrationId/cancel')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel an event registration' })
+  async cancelRegistration(@Param('registrationId') registrationId: string) {
+    await this.svc.cancelRegistration(Number(registrationId));
+    return { message: 'Registration cancelled successfully' };
+  }
 }
