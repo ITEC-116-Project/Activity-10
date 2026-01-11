@@ -151,6 +151,32 @@ const MyTickets = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         document.body.removeChild(element);
+        // also send the generated PNG to the user's email
+        try {
+          const token = sessionStorage.getItem('token');
+          if (token) {
+            const form = new FormData();
+            form.append('file', blob, `${ticketId.replace(/\//g, '-')}.png`);
+            const res = fetch(`http://localhost:3000/events/${t.id}/send-ticket`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`
+              },
+              body: form
+            }).then(async (r) => {
+              if (!r.ok) {
+                const txt = await r.text();
+                throw new Error(txt || 'Failed to send ticket');
+              }
+              Swal.fire({ icon: 'success', title: 'Sent', text: 'Ticket sent to your email.', confirmButtonColor: '#0f766e' });
+            }).catch(err => {
+              console.error('Failed to send ticket by email', err);
+              Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to send ticket to your email', confirmButtonColor: '#ef4444' });
+            });
+          }
+        } catch (err) {
+          console.error('Error sending ticket', err);
+        }
       });
     } catch (err) {
       console.error('Error generating image:', err);
