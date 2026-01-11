@@ -30,27 +30,40 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
 
 .user-greeting {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.header-separator {
+  width: 1px;
+  height: 24px;
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 .logout-button {
-  padding: 10px 20px;
-  background: white;
-  color: #0f766e;
+  background: none;
   border: none;
-  border-radius: 5px;
-  font-weight: 600;
+  color: white;
   cursor: pointer;
-  transition: transform 0.2s;
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
 }
 
 .logout-button:hover {
-  transform: translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.logout-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .dashboard-layout {

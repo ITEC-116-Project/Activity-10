@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import '../styles/OrganizerDashboard.css';
 import SideNav from '../components/SideNav.jsx';
 import NotificationDropdown from '../components/NotificationDropdown.jsx';
+import UserAvatar from '../../shared/components/UserAvatar.jsx';
 import Home from './Home.jsx';
 import Events from './Events.jsx';
 import MyTickets from './MyTickets.jsx';
@@ -100,8 +101,15 @@ const OrganizerDashboard = () => {
         <h1>Event Management System</h1>
         <div className="header-right">
           <span className="user-greeting">Welcome, {userName}!</span>
+          <UserAvatar userName={userName} />
           <NotificationDropdown />
-          <button onClick={handleLogout} className="logout-button">Logout</button>
+          <div className="header-separator"></div>
+          <button onClick={handleLogout} className="logout-button" title="Logout">
+            <svg className="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+              <line x1="12" y1="2" x2="12" y2="12"></line>
+            </svg>
+          </button>
         </div>
       </div>
       
