@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Pagination from '../../components/Pagination';
 
 const Reports = () => {
@@ -14,67 +14,59 @@ const Reports = () => {
     }
   });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [allEvents, setAllEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [eventAttendees, setEventAttendees] = useState({});
 
-  const allEvents = [
-    {
-      id: 1,
-      title: 'Tech Conference 2026',
-      date: '2026-02-15',
-      time: '09:00 - 17:00',
-      location: 'Manila Convention Center',
-      capacity: 500,
-      registered: 234,
-      status: 'Completed',
-      description: 'A full-day technology conference covering AI, cloud, and modern web development.',
-      organizerName: 'Tech Events Inc.',
-      organizerEmail: 'info@techevents.com',
-      staff: ['John Doe', 'Jane Smith', 'Mike Johnson']
-    },
-    {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'Completed',
-      description: 'Hands-on workshop on modern web development frameworks.',
-      organizerName: 'Dev Academy',
-      organizerEmail: 'workshops@devacademy.com',
-      staff: ['Sarah Lee', 'Tom Wilson']
-    },
-    {
-      id: 3,
-      title: 'Business Seminar',
-      date: '2026-03-10',
-      time: '10:00 - 16:00',
-      location: 'Makati Business Center',
-      capacity: 200,
-      registered: 145,
-      status: 'Completed',
-      description: 'Business growth and entrepreneurship seminar.',
-      organizerName: 'Business Hub PH',
-      organizerEmail: 'hello@businesshubph.com',
-      staff: ['Alex Chen', 'Maria Garcia', 'Robert Kim']
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const organizerId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+        if (!organizerId) {
+          throw new Error('Organizer not authenticated');
+        }
+
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/events/by-creator/${organizerId}`);
+        if (!res.ok) throw new Error('Failed to load events');
+        const data = await res.json();
+        setAllEvents(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (err) {
+        console.error('Load events failed', err);
+        setError(err.message || 'Failed to load events');
+        setAllEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  // Get attendees from database
+  const getEventAttendees = async (eventId) => {
+    if (eventAttendees[eventId]) {
+      return eventAttendees[eventId];
     }
-  ];
 
-  // Get attendees from localStorage
-  const getEventAttendees = (eventId) => {
     try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.filter(t => t.eventId === eventId);
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const res = await fetch(`${base}/events/${eventId}/attendees`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const attendees = Array.isArray(data) ? data : [];
+      setEventAttendees(prev => ({ ...prev, [eventId]: attendees }));
+      return attendees;
     } catch {
       return [];
     }
   };
 
-  // Filter for completed/past events only
-  const pastEvents = allEvents.filter(event => event.status === 'Completed' || new Date(event.date) < new Date());
-
-  const filteredEvents = pastEvents.filter(event =>
+  // Show all events regardless of status
+  const filteredEvents = allEvents.filter(event =>
     event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     event.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -93,77 +85,143 @@ const Reports = () => {
     }
   };
 
-  const downloadAttendanceReport = (event) => {
-    const attendees = getEventAttendees(event.id);
+  const downloadAttendanceReport = async (event) => {
+    const attendees = await getEventAttendees(event.id);
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+
+    // Header Background
+    doc.setFillColor(15, 118, 110);
+    doc.rect(0, 0, pageWidth, 45, 'F');
 
     // Title
-    doc.setFontSize(16);
-    doc.setTextColor(15, 118, 110);
-    doc.text(`${event.title} - Attendance Report`, 14, 20);
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(undefined, 'bold');
+    doc.text('ATTENDANCE REPORT', margin, 18);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'normal');
+    doc.text(event.title, margin, 28);
 
-    // Event Details
+    // Event Details Section
+    let yPos = 55;
     doc.setFontSize(11);
-    doc.setTextColor(50, 50, 50);
-    doc.text(`Date: ${new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 35);
-    doc.text(`Time: ${event.time}`, 14, 43);
-    doc.text(`Location: ${event.location}`, 14, 51);
-    doc.text(`Organizer: ${event.organizerName}`, 14, 59);
-    doc.text(`Organizer Email: ${event.organizerEmail}`, 14, 67);
-    
-    if (event.staff && event.staff.length > 0) {
-      doc.text(`Staff: ${event.staff.join(', ')}`, 14, 75);
-      doc.text(`Description: ${event.description}`, 14, 83);
-    } else {
-      doc.text(`Description: ${event.description}`, 14, 75);
-    }
-
-    // Attendance Summary
-    doc.setFontSize(12);
     doc.setTextColor(15, 118, 110);
-    doc.text('Attendance Summary', 14, 100);
+    doc.setFont(undefined, 'bold');
+    doc.text('EVENT INFORMATION', margin, yPos);
     
+    yPos += 8;
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.text(`Total Capacity: ${event.capacity}`, 14, 108);
-    doc.text(`Total Registered: ${event.registered}`, 14, 116);
-    doc.text(`Attendance Rate: ${((event.registered / event.capacity) * 100).toFixed(1)}%`, 14, 124);
+    doc.setFont(undefined, 'normal');
+    
+    const eventDetails = [
+      { label: 'Date:', value: new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) },
+      { label: 'Time:', value: event.time },
+      { label: 'Location:', value: event.location },
+      { label: 'Organizer:', value: event.createdByName || event.organizerName || 'N/A' },
+      { label: 'Email:', value: event.createdByEmail || event.organizerEmail || 'N/A' },
+      { label: 'Description:', value: event.description || 'N/A' }
+    ];
 
-    // Attendees Table
-    doc.setFontSize(12);
+    eventDetails.forEach(detail => {
+      doc.setFont(undefined, 'bold');
+      doc.text(detail.label, margin, yPos);
+      doc.setFont(undefined, 'normal');
+      doc.text(detail.value, margin + 25, yPos);
+      yPos += 6;
+    });
+
+    // Attendance Summary Section
+    yPos += 5;
+    doc.setFillColor(230, 240, 240);
+    doc.rect(margin, yPos - 4, pageWidth - (2 * margin), 28, 'F');
+    
+    doc.setFontSize(11);
     doc.setTextColor(15, 118, 110);
-    doc.text('Registered Attendees', 14, 140);
+    doc.setFont(undefined, 'bold');
+    doc.text('ATTENDANCE SUMMARY', margin + 3, yPos + 2);
+    
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont(undefined, 'normal');
+    
+    const summaryData = [
+      { label: 'Total Capacity:', value: event.capacity },
+      { label: 'Total Registered:', value: event.registered },
+      { label: 'Attendance Rate:', value: `${((event.registered / event.capacity) * 100).toFixed(1)}%` }
+    ];
 
+    summaryData.forEach(item => {
+      doc.setFont(undefined, 'bold');
+      doc.text(item.label, margin + 3, yPos);
+      doc.setFont(undefined, 'normal');
+      doc.text(String(item.value), pageWidth - margin - 40, yPos);
+      yPos += 6;
+    });
+
+    // Participants Table
+    yPos += 8;
     if (attendees.length > 0) {
       const tableData = attendees.map(attendee => [
-        attendee.userName,
+        attendee.attendeeName || 'N/A',
         new Date(attendee.registeredAt).toLocaleDateString('en-US'),
         new Date(attendee.registeredAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        attendee.ticketId
+        attendee.ticketCode ? attendee.ticketCode.substring(0, 20) + '...' : 'N/A',
+        (attendee.status || 'inactive').charAt(0).toUpperCase() + (attendee.status || 'inactive').slice(1)
       ]);
 
-      doc.autoTable({
-        head: [['Name', 'Registration Date', 'Registration Time', 'Ticket ID']],
+      autoTable(doc, {
+        head: [['Participant Name', 'Registration Date', 'Time', 'Ticket ID', 'Status']],
         body: tableData,
-        startY: 147,
-        theme: 'striped',
-        headerStyles: {
+        startY: yPos,
+        theme: 'grid',
+        headStyles: {
           fillColor: [15, 118, 110],
           textColor: 255,
-          fontStyle: 'bold'
+          fontStyle: 'bold',
+          fontSize: 10,
+          halign: 'center'
         },
-        margin: { top: 140 }
+        bodyStyles: {
+          fontSize: 9,
+          textColor: [50, 50, 50]
+        },
+        alternateRowStyles: {
+          fillColor: [245, 250, 250]
+        },
+        columnStyles: {
+          0: { halign: 'left' },
+          1: { halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'left', fontSize: 8 },
+          4: { halign: 'center' }
+        },
+        margin: { top: yPos, left: margin, right: margin },
+        didDrawPage: (data) => {
+          // Footer on each page
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.getHeight();
+          const pageWidth = pageSize.getWidth();
+          
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text(`Generated on ${new Date().toLocaleString('en-US')}`, margin, pageHeight - 8);
+          doc.text(`Page ${data.pageNumber} of ${data.pageCount}`, pageWidth - margin - 30, pageHeight - 8);
+        }
       });
     } else {
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      doc.text('No attendees registered yet.', 14, 147);
+      doc.text('No attendees registered yet.', margin, yPos + 5);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generated on ${new Date().toLocaleString('en-US')}`, margin, doc.internal.pageSize.getHeight() - 8);
     }
-
-    // Footer
-    doc.setFontSize(9);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated on ${new Date().toLocaleString('en-US')}`, 14, doc.internal.pageSize.height - 10);
 
     doc.save(`${event.title.replace(/\s+/g, '_')}_Attendance_Report.pdf`);
   };
@@ -240,14 +298,14 @@ const Reports = () => {
         </>
       ) : (
         <div className="empty-state">
-          <p>No completed events found</p>
+          <p>No events found</p>
         </div>
       )}
 
       {selectedEvent && (
         <EventDetailsModal
           event={selectedEvent}
-          attendees={getEventAttendees(selectedEvent.id)}
+          getAttendees={getEventAttendees}
           onClose={() => setSelectedEvent(null)}
           onDownload={() => downloadAttendanceReport(selectedEvent)}
         />
@@ -256,13 +314,24 @@ const Reports = () => {
   );
 };
 
-const EventDetailsModal = ({ event, attendees, onClose, onDownload }) => {
+const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [attendees, setAttendees] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAttendees = async () => {
+      setLoading(true);
+      const data = await getAttendees(event.id);
+      setAttendees(data);
+      setLoading(false);
+    };
+    fetchAttendees();
+  }, [event.id]);
 
   const filteredAttendees = attendees.filter(a =>
-    a.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (a.email && a.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    a.ticketId.toLowerCase().includes(searchTerm.toLowerCase())
+    (a.attendeeName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.ticketCode || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -307,11 +376,11 @@ const EventDetailsModal = ({ event, attendees, onClose, onDownload }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Organizer</p>
-                <p style={{ margin: 0, color: '#1f2937' }}>{event.organizerName || '—'}</p>
+                <p style={{ margin: 0, color: '#1f2937' }}>{event.createdByName || event.organizerName || '—'}</p>
               </div>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#4b5563', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Email</p>
-                <p style={{ margin: 0, color: '#0f766e' }}>{event.organizerEmail || '—'}</p>
+                <p style={{ margin: 0, color: '#0f766e' }}>{event.createdByEmail || event.organizerEmail || '—'}</p>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -347,19 +416,21 @@ const EventDetailsModal = ({ event, attendees, onClose, onDownload }) => {
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Email</th>
                     <th>Ticket ID</th>
                     <th>Registration Date</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAttendees.length > 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Loading participants...</td>
+                    </tr>
+                  ) : filteredAttendees.length > 0 ? (
                     filteredAttendees.map(a => (
                       <tr key={a.id}>
-                        <td><strong>{a.userName}</strong></td>
-                        <td>{a.email || '—'}</td>
-                        <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{a.ticketId}</td>
+                        <td><strong>{a.attendeeName || 'N/A'}</strong></td>
+                        <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{a.ticketCode || 'N/A'}</td>
                         <td>{new Date(a.registeredAt).toLocaleDateString('en-US')}</td>
                         <td>
                           <span style={{
@@ -368,15 +439,15 @@ const EventDetailsModal = ({ event, attendees, onClose, onDownload }) => {
                             borderRadius: '12px',
                             fontSize: '12px',
                             fontWeight: 600,
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46'
-                          }}>Active</span>
+                            backgroundColor: a.status === 'active' ? '#d1fae5' : '#fee2e2',
+                            color: a.status === 'active' ? '#065f46' : '#991b1b'
+                          }}>{(a.status || 'inactive').charAt(0).toUpperCase() + (a.status || 'inactive').slice(1)}</span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No participants found</td>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No participants found</td>
                     </tr>
                   )}
                 </tbody>

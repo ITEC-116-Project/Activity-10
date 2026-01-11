@@ -30,6 +30,28 @@ export class ManageAccountService {
     ];
   }
 
+  async getActiveCounts() {
+    const [activeOrganizers, activeAttendees] = await Promise.all([
+      this.organizerRepository.count({ where: { isActive: true } }),
+      this.attendeesRepository.count({ where: { isActive: true } }),
+    ]);
+
+    return {
+      activeOrganizers,
+      activeAttendees,
+    };
+  }
+
+  async getActiveAttendeesList() {
+    const attendees = await this.attendeesRepository.find({ where: { isActive: true } });
+    return attendees.map((a) => this.toSafeAccount(a, 'attendees'));
+  }
+
+  async getActiveOrganizersList() {
+    const organizers = await this.organizerRepository.find({ where: { isActive: true } });
+    return organizers.map((o) => this.toSafeAccount(o, 'organizer'));
+  }
+
   async findOne(roleInput: string, id: number) {
     const role = this.normalizeRole(roleInput);
     const repository = this.getRepository(role);

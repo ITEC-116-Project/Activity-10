@@ -12,6 +12,10 @@ const Home = ({ onRedirectToEdit }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeAttendees, setActiveAttendees] = useState(0);
+  const [activeOrganizers, setActiveOrganizers] = useState(0);
+  const [activeAttendeeList, setActiveAttendeeList] = useState([]);
+  const [activeOrganizerList, setActiveOrganizerList] = useState([]);
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -34,7 +38,38 @@ const Home = ({ onRedirectToEdit }) => {
       }
     };
 
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${base}/manage-account/stats`);
+        if (!res.ok) return;
+        const stats = await res.json();
+        setActiveAttendees(Number(stats.activeAttendees || 0));
+        setActiveOrganizers(Number(stats.activeOrganizers || 0));
+      } catch (e) {
+        // ignore stats errors
+      }
+    };
+
+    const fetchActiveLists = async () => {
+      try {
+        const [attRes, orgRes] = await Promise.all([
+          fetch(`${base}/manage-account/attendees/active`),
+          fetch(`${base}/manage-account/organizers/active`)
+        ]);
+        if (attRes.ok) {
+          const attendees = await attRes.json();
+          setActiveAttendeeList(Array.isArray(attendees) ? attendees : []);
+        }
+        if (orgRes.ok) {
+          const organizers = await orgRes.json();
+          setActiveOrganizerList(Array.isArray(organizers) ? organizers : []);
+        }
+      } catch {}
+    };
+
     fetchEvents();
+    fetchStats();
+    fetchActiveLists();
   }, []);
 
   const filteredEvents = events.filter(event => {
@@ -81,15 +116,15 @@ const Home = ({ onRedirectToEdit }) => {
         <div className="stat-card">
           <MdPeople className="stat-icon" />
           <div className="stat-info">
-            <h3>Total Users</h3>
-            <p className="stat-value">0</p>
+            <h3>Active Attendees</h3>
+            <p className="stat-value">{activeAttendees}</p>
           </div>
         </div>
         <div className="stat-card">
           <MdStars className="stat-icon" />
           <div className="stat-info">
             <h3>Active Organizers</h3>
-            <p className="stat-value">0</p>
+            <p className="stat-value">{activeOrganizers}</p>
           </div>
         </div>
       </div>
@@ -218,6 +253,42 @@ const Home = ({ onRedirectToEdit }) => {
             onRedirectToEdit={onRedirectToEdit}
           />
         )}
+      </div>
+
+      <div className="events-section" style={{ marginTop: '20px' }}>
+        <h3>Active Accounts</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="card" style={{ padding: '12px' }}>
+            <h4 style={{ marginBottom: '8px' }}>Active Attendees ({activeAttendeeList.length})</h4>
+            {activeAttendeeList.length === 0 ? (
+              <div className="empty-state"><p>No active attendees</p></div>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {activeAttendeeList.map((a) => (
+                  <li key={`att-${a.id}`} style={{ padding: '8px 6px', borderBottom: '1px solid #eee' }}>
+                    <strong>{a.firstName} {a.lastName}</strong>
+                    <div style={{ color: '#555', fontSize: '12px' }}>{a.email}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="card" style={{ padding: '12px' }}>
+            <h4 style={{ marginBottom: '8px' }}>Active Organizers ({activeOrganizerList.length})</h4>
+            {activeOrganizerList.length === 0 ? (
+              <div className="empty-state"><p>No active organizers</p></div>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {activeOrganizerList.map((o) => (
+                  <li key={`org-${o.id}`} style={{ padding: '8px 6px', borderBottom: '1px solid #eee' }}>
+                    <strong>{o.firstName} {o.lastName}</strong>
+                    <div style={{ color: '#555', fontSize: '12px' }}>{o.email}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -54,6 +54,16 @@ export class AccountLoginService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Activate user if currently inactive (for organizer and attendees)
+    if (role !== 'admin' && user.isActive === false) {
+      user.isActive = true;
+      if (role === 'organizer') {
+        await this.organizerRepository.save(user);
+      } else if (role === 'attendees') {
+        await this.attendeesRepository.save(user);
+      }
+    }
+
     const payload = { 
       userId: user.id, 
       email: user.email, 
@@ -71,6 +81,7 @@ export class AccountLoginService {
       username: user.username,
       firstName: user.firstName,
       lastName: user.lastName,
+      isActive: user.isActive ?? undefined,
     };
   }
 
