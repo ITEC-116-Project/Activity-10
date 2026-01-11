@@ -51,6 +51,12 @@ export class EventController {
     return this.svc.getAttendeeRegistrations(Number(attendeeId));
   }
 
+  @Get('admin/:adminId/registrations')
+  @ApiOperation({ summary: 'Get all event registrations for an admin' })
+  async getAdminRegistrations(@Param('adminId') adminId: string) {
+    return this.svc.getAdminRegistrations(Number(adminId));
+  }
+
   @Get(':eventId/attendee/:attendeeId/check')
   @ApiOperation({ summary: 'Check if attendee is registered for an event' })
   async isRegistered(@Param('eventId') eventId: string, @Param('attendeeId') attendeeId: string) {

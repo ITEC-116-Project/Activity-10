@@ -4,17 +4,63 @@ import Pagination from '../../components/Pagination';
 
 const MyTickets = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [tickets, setTickets] = useState(() => {
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'table'
   const [selectedTicket, setSelectedTicket] = useState(null);
+
+  // Fetch tickets from backend
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        const adminId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+        if (!adminId) {
+          throw new Error('User not authenticated');
+        }
+
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${base}/events/admin/${adminId}/registrations`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch tickets');
+        }
+
+        const registrations = await response.json();
+        
+        // Transform registrations to ticket format
+        const transformedTickets = registrations.map(reg => ({
+          id: reg.id,
+          ticketId: reg.ticketCode,
+          ticketCode: reg.ticketCode,
+          eventId: reg.eventId,
+          eventTitle: reg.event?.title || 'Event',
+          date: reg.event?.date,
+          time: reg.event?.time,
+          location: reg.event?.location,
+          status: reg.status || reg.event?.status || 'inactive',
+          registeredAt: reg.registeredAt,
+          userName: reg.attendeeName,
+          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({ ticketCode: reg.ticketCode, eventId: reg.eventId, eventTitle: reg.event?.title, userName: reg.attendeeName }))}`,
+          description: reg.event?.description,
+          organizerName: reg.event?.createdByName,
+          organizerEmail: reg.event?.createdByEmail
+        }));
+
+        setTickets(transformedTickets);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching tickets:', err);
+        setError(err.message || 'Failed to load tickets');
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTickets();
+  }, []);
 
   const itemsPerPage = viewMode === 'card' ? 5 : 10;
   const totalPages = Math.ceil(tickets.length / itemsPerPage);
@@ -81,22 +127,9 @@ const MyTickets = () => {
     }
   };
 
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === 'myTickets') {
-        try {
-          const parsed = e.newValue ? JSON.parse(e.newValue) : [];
-          setTickets(Array.isArray(parsed) ? parsed : []);
-        } catch {
-          setTickets([]);
-        }
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
 
-  const handleCancelRegistration = (ticketId) => {
+
+  const handleCancelRegistration = async (ticketId) => {
     Swal.fire({
       icon: 'warning',
       title: 'Cancel Registration',
@@ -105,12 +138,38 @@ const MyTickets = () => {
       confirmButtonColor: '#dc2626',
       showCancelButton: true,
       cancelButtonText: 'No, Keep It'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
         try {
+          const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          
+          const response = await fetch(`${base}/events/${ticketId}/cancel`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : ''
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to cancel registration');
+          }
+
+          // Remove from local state
           const updatedTickets = tickets.filter(t => t.id !== ticketId);
-          localStorage.setItem('myTickets', JSON.stringify(updatedTickets));
           setTickets(updatedTickets);
+          
+          // Also remove from localStorage if it exists
+          try {
+            const raw = localStorage.getItem('myTickets');
+            if (raw) {
+              const localTickets = JSON.parse(raw);
+              const updatedLocal = localTickets.filter(t => t.id !== ticketId);
+              localStorage.setItem('myTickets', JSON.stringify(updatedLocal));
+            }
+          } catch {}
+
           Swal.fire({
             icon: 'success',
             title: 'Cancelled!',
@@ -119,10 +178,11 @@ const MyTickets = () => {
             confirmButtonColor: '#0f766e'
           });
         } catch (err) {
+          console.error('Cancel error:', err);
           Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Failed to cancel registration. Please try again.',
+            text: err.message || 'Failed to cancel registration. Please try again.',
             confirmButtonText: 'OK',
             confirmButtonColor: '#dc2626'
           });
@@ -140,7 +200,14 @@ const MyTickets = () => {
           <option value="table">≡ Table</option>
         </select>
       </div>
-      {tickets.length === 0 ? (
+      {error && (
+        <div style={{ padding: '10px', marginBottom: '12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b' }}>
+          {error}
+        </div>
+      )}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '24px', color: '#555' }}>Loading tickets...</div>
+      ) : tickets.length === 0 ? (
         <div className="empty-state">
           <p>No tickets yet. Register to an event to see it here.</p>
         </div>

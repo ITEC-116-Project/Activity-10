@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
 import { Event } from './event';
 import { Attendees } from './attendees';
+import { Admin } from './admin';
 
 @Entity('event_attendees')
 export class EventAttendees {
@@ -10,14 +11,20 @@ export class EventAttendees {
   @Column()
   eventId: number;
 
-  @Column()
-  attendeeId: number;
+  @Column({ nullable: true })
+  attendeeId: number | null;
+
+  @Column({ nullable: true })
+  adminId: number | null;
 
   @Column()
   attendeeName: string;
 
   @Column()
   ticketCode: string;
+
+  @Column({ default: 'inactive' })
+  status: string;
 
   @CreateDateColumn()
   registeredAt: Date;
@@ -26,7 +33,11 @@ export class EventAttendees {
   @JoinColumn({ name: 'eventId' })
   event: Event;
 
-  @ManyToOne(() => Attendees, (attendee) => attendee.registrations, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Attendees, (attendee) => attendee.registrations, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'attendeeId' })
-  attendee: Attendees;
+  attendee: Attendees | null;
+
+  @ManyToOne(() => Admin, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'adminId' })
+  admin: Admin | null;
 }

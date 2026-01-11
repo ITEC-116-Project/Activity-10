@@ -240,36 +240,70 @@ const EventDetailsModal = ({ event, onClose, onRedirectToEdit }) => {
     onClose();
   };
 
-  const handleRegister = () => {
-    const ticketId = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    const qrData = JSON.stringify({ ticketId, eventId: event.id, eventTitle: event.title, userName });
+  const handleRegister = async () => {
+    const ticketCode = `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const qrData = JSON.stringify({ ticketCode, eventId: event.id, eventTitle: event.title, userName });
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
 
-    const ticket = {
-      id: ticketId,
-      ticketId,
-      eventId: event.id,
-      eventTitle: event.title,
-      date: event.date,
-      time: event.time,
-      location: event.location,
-      status: event.status,
-      registeredAt: new Date().toISOString(),
-      userName,
-      qrCode: qrUrl
-    };
-
     try {
+      // Get admin ID from localStorage/sessionStorage
+      const adminId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+      if (!adminId) {
+        throw new Error('User not authenticated');
+      }
+
+      // Register via backend API
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await fetch(`${base}/events/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          adminId: parseInt(adminId),
+          attendeeName: userName,
+          ticketCode: ticketCode
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to register for event');
+      }
+
+      const registration = await response.json();
+
+      // Also save to localStorage for quick access
+      const ticket = {
+        id: registration.id,
+        ticketId: ticketCode,
+        ticketCode: ticketCode,
+        eventId: event.id,
+        eventTitle: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        status: event.status,
+        registeredAt: registration.registeredAt || new Date().toISOString(),
+        userName,
+        qrCode: qrUrl
+      };
+
       const raw = localStorage.getItem('myTickets');
       const tickets = raw ? JSON.parse(raw) : [];
       tickets.push(ticket);
       localStorage.setItem('myTickets', JSON.stringify(tickets));
+
       Swal.fire({
         icon: 'success',
         title: 'Registration Successful!',
         html: `<div style="text-align: left;">
           <div style="background: #f0f9f8; padding: 10px; margin: 8px 0; border-left: 3px solid #0f766e; border-radius: 4px;">
-            <strong style="color: #0f766e;">Ticket ID:</strong> ${ticketId}
+            <strong style="color: #0f766e;">Ticket ID:</strong> ${ticketCode}
           </div>
           <div style="margin: 8px 0;"><strong style="color: #333;">Event:</strong> ${event.title}</div>
           <div style="margin: 8px 0;"><strong style="color: #333;">Attendee:</strong> ${userName}</div>
@@ -280,10 +314,11 @@ const EventDetailsModal = ({ event, onClose, onRedirectToEdit }) => {
       setIsRegistered(true);
       onClose();
     } catch (err) {
+      console.error('Registration error:', err);
       Swal.fire({
         icon: 'error',
         title: 'Registration Failed',
-        text: 'Please try again.',
+        text: err.message || 'Please try again.',
         confirmButtonColor: '#dc2626'
       });
     }

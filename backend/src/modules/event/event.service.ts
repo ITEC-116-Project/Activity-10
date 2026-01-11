@@ -63,16 +63,26 @@ export class EventService {
   }
 
   async registerForEvent(dto: RegisterForEventDto) {
+    // Validate that either attendeeId or adminId is provided
+    if (!dto.attendeeId && !dto.adminId) {
+      throw new ConflictException('Either attendeeId or adminId must be provided');
+    }
+
     // Check if already registered
+    const whereCondition: any = { eventId: dto.eventId };
+    if (dto.attendeeId) {
+      whereCondition.attendeeId = dto.attendeeId;
+    }
+    if (dto.adminId) {
+      whereCondition.adminId = dto.adminId;
+    }
+
     const existingRegistration = await this.eventAttendeesRepo.findOne({
-      where: {
-        eventId: dto.eventId,
-        attendeeId: dto.attendeeId
-      }
+      where: whereCondition
     });
 
     if (existingRegistration) {
-      throw new ConflictException('Attendee is already registered for this event');
+      throw new ConflictException('User is already registered for this event');
     }
 
     // Check if event exists
@@ -84,9 +94,11 @@ export class EventService {
     // Create registration
     const registration = this.eventAttendeesRepo.create({
       eventId: dto.eventId,
-      attendeeId: dto.attendeeId,
+      attendeeId: dto.attendeeId || null,
+      adminId: dto.adminId || null,
       attendeeName: dto.attendeeName,
       ticketCode: dto.ticketCode,
+      status: 'inactive',
     });
 
     const saved = await this.eventAttendeesRepo.save(registration);
@@ -109,6 +121,15 @@ export class EventService {
       where: { attendeeId },
       order: { registeredAt: 'DESC' }
     });
+  }
+
+  async getAdminRegistrations(adminId: number) {
+    const registrations = await this.eventAttendeesRepo.find({
+      where: { adminId },
+      relations: ['event'],
+      order: { registeredAt: 'DESC' }
+    });
+    return registrations;
   }
 
   async isAttendeeRegistered(eventId: number, attendeeId: number): Promise<boolean> {
