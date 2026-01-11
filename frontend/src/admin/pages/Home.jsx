@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MdEvent, MdPeople, MdStars } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
@@ -9,174 +9,33 @@ const Home = ({ onRedirectToEdit }) => {
   const [filterStatus, setFilterStatus] = useState('active');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [viewMode, setViewMode] = useState('card');
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const events = [
-    {
-      id: 1,
-      title: 'Tech Conference 2026',
-      date: '2026-02-15',
-      time: '09:00 - 17:00',
-      location: 'Manila Convention Center',
-      capacity: 500,
-      registered: 234,
-      status: 'upcoming',
-      description: 'A full-day technology conference covering AI, cloud, and modern web development.'
-    },
-    {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'ongoing',
-      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
-    },
-    {
-      id: 3,
-      title: 'Business Seminar',
-      date: '2026-03-10',
-      time: '10:00 - 16:00',
-      location: 'Makati Business Center',
-      capacity: 200,
-      registered: 145,
-      status: 'upcoming',
-      description: 'Executive seminar on scaling operations, finance strategies, and leadership.'
-    },
-    {
-      id: 4,
-      title: 'Digital Marketing Summit',
-      date: '2026-02-22',
-      time: '09:00 - 15:00',
-      location: 'Quezon City Conference Hall',
-      capacity: 300,
-      registered: 178,
-      status: 'upcoming',
-      description: 'Learn the latest digital marketing strategies, SEO techniques, and social media trends.'
-    },
-    {
-      id: 5,
-      title: 'Data Science Bootcamp',
-      date: '2026-03-05',
-      time: '08:00 - 18:00',
-      location: 'Taguig Tech Center',
-      capacity: 150,
-      registered: 142,
-      status: 'upcoming',
-      description: 'Intensive bootcamp covering Python, machine learning, and data visualization.'
-    },
-    {
-      id: 6,
-      title: 'UX/UI Design Workshop',
-      date: '2026-01-28',
-      time: '13:00 - 17:00',
-      location: 'Pasig Creative Space',
-      capacity: 80,
-      registered: 65,
-      status: 'ongoing',
-      description: 'Practical workshop on user experience design principles and prototyping tools.'
-    },
-    {
-      id: 7,
-      title: 'Cybersecurity Awareness Training',
-      date: '2026-02-10',
-      time: '10:00 - 14:00',
-      location: 'Ortigas Business District',
-      capacity: 120,
-      registered: 98,
-      status: 'upcoming',
-      description: 'Essential cybersecurity training for businesses and individuals.'
-    },
-    {
-      id: 8,
-      title: 'Mobile App Development Expo',
-      date: '2026-03-18',
-      time: '09:00 - 18:00',
-      location: 'Mall of Asia Arena',
-      capacity: 600,
-      registered: 412,
-      status: 'upcoming',
-      description: 'Expo showcasing latest mobile technologies, frameworks, and app development tools.'
-    },
-    {
-      id: 9,
-      title: 'Startup Pitch Competition',
-      date: '2026-02-28',
-      time: '14:00 - 19:00',
-      location: 'Alabang Town Center',
-      capacity: 250,
-      registered: 189,
-      status: 'upcoming',
-      description: 'Aspiring entrepreneurs pitch their startup ideas to venture capitalists and mentors.'
-    },
-    {
-      id: 10,
-      title: 'Cloud Computing Seminar',
-      date: '2026-01-25',
-      time: '10:00 - 15:00',
-      location: 'Mandaluyong IT Park',
-      capacity: 180,
-      registered: 156,
-      status: 'ongoing',
-      description: 'Deep dive into AWS, Azure, and Google Cloud platforms and migration strategies.'
-    },
-    {
-      id: 11,
-      title: 'E-Commerce Growth Workshop',
-      date: '2026-03-12',
-      time: '13:00 - 18:00',
-      location: 'Greenhills Shopping Center',
-      capacity: 100,
-      registered: 76,
-      status: 'upcoming',
-      description: 'Strategies for scaling e-commerce businesses and optimizing online sales.'
-    },
-    {
-      id: 12,
-      title: 'AI and Automation Conference',
-      date: '2026-03-20',
-      time: '08:30 - 17:30',
-      location: 'PICC Manila',
-      capacity: 450,
-      registered: 321,
-      status: 'upcoming',
-      description: 'Conference exploring artificial intelligence, automation, and their business applications.'
-    },
-    {
-      id: 13,
-      title: 'Blockchain Technology Forum',
-      date: '2026-02-18',
-      time: '09:00 - 16:00',
-      location: 'BGC Financial Center',
-      capacity: 200,
-      registered: 167,
-      status: 'upcoming',
-      description: 'Forum discussing blockchain applications, cryptocurrency, and decentralized finance.'
-    },
-    {
-      id: 14,
-      title: 'Game Development Meetup',
-      date: '2026-03-08',
-      time: '15:00 - 20:00',
-      location: 'Eastwood City Game Hub',
-      capacity: 120,
-      registered: 94,
-      status: 'upcoming',
-      description: 'Meetup for game developers to showcase projects and discuss Unity and Unreal Engine.'
-    },
-    {
-      id: 15,
-      title: 'Project Management Certification',
-      date: '2026-02-25',
-      time: '08:00 - 17:00',
-      location: 'Makati Executive Tower',
-      capacity: 90,
-      registered: 81,
-      status: 'upcoming',
-      description: 'Full-day certification training on agile methodologies and project management best practices.'
-    }
-  ];
+  useEffect(() => {
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${base}/events`);
+        if (!res.ok) {
+          throw new Error(`Failed to load events (${res.status})`);
+        }
+        const data = await res.json();
+        setEvents(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (err) {
+        console.error('Load events failed', err);
+        setError(err.message || 'Failed to load events');
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   const filteredEvents = events.filter(event => {
     const isActiveEvent = event.status === 'upcoming' || event.status === 'ongoing';
@@ -237,6 +96,11 @@ const Home = ({ onRedirectToEdit }) => {
 
       <div className="events-section">
         <h3>Upcoming & Ongoing Events</h3>
+        {error && (
+          <div style={{ padding: '10px', marginBottom: '12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b' }}>
+            {error}
+          </div>
+        )}
         <div className="search-bar">
           <input
             type="text"
@@ -254,6 +118,10 @@ const Home = ({ onRedirectToEdit }) => {
             <option value="table">≡ Table</option>
           </select>
         </div>
+
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#555' }}>Loading events...</div>
+        )}
 
         {viewMode === 'card' ? (
         <>

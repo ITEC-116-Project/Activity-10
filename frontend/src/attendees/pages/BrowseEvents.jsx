@@ -623,9 +623,9 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
               </div>
             </div>
             <div className="modal-actions" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
-              <button className="btn-secondary" onClick={onClose}>Close</button>
+              <button className="btn-secondary modal-btn" onClick={onClose}>Close</button>
               <button
-                className="btn-primary"
+                className="btn-primary modal-btn"
                 style={{ background: isRegistered ? '#9ca3af' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', cursor: isRegistered ? 'not-allowed' : 'pointer' }}
                 onClick={handleRegisterClick}
                 disabled={isRegistered}

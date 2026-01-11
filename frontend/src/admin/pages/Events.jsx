@@ -19,41 +19,9 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
     }
   });
   const [filterStatus, setFilterStatus] = useState('all');
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: 'Tech Conference 2026',
-      date: '2026-02-15',
-      time: '09:00 - 17:00',
-      location: 'Manila Convention Center',
-      capacity: 500,
-      registered: 234,
-      status: 'upcoming',
-      description: 'A full-day technology conference covering AI, cloud, and modern web development.'
-    },
-    {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'ongoing',
-      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
-    },
-    {
-      id: 3,
-      title: 'Business Seminar',
-      date: '2026-03-10',
-      time: '10:00 - 16:00',
-      location: 'Makati Business Center',
-      capacity: 200,
-      registered: 145,
-      status: 'upcoming',
-      description: 'Executive seminar on scaling operations, finance strategies, and leadership.'
-    }
-  ]);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (initialEventToEdit) {
@@ -62,6 +30,28 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
       if (onClearEditEvent) onClearEditEvent();
     }
   }, [initialEventToEdit, onClearEditEvent]);
+
+  useEffect(() => {
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${base}/events`);
+        if (!res.ok) throw new Error(`Failed to load events (${res.status})`);
+        const data = await res.json();
+        setEvents(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (err) {
+        console.error('Load events failed', err);
+        setError(err.message || 'Failed to load events');
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
@@ -134,14 +124,26 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
         </select>
       </div>
 
+      {error && (
+        <div style={{ padding: '10px', margin: '10px 0', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#991b1b' }}>
+          {error}
+        </div>
+      )}
+      {loading && (
+        <div style={{ padding: '16px', margin: '8px 0', textAlign: 'center', color: '#555' }}>Loading events...</div>
+      )}
+
       {viewMode === 'card' ? (
       <>
       <div className="events-grid">
         {events.filter(event => {
+          const status = (event.status || '').toLowerCase();
           const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+          const matchesFilter = filterStatus === 'all' ? true : (filterStatus === 'past' ? status === 'past' || status === 'completed' : status === filterStatus);
           return matchesSearch && matchesFilter;
-        }).slice((currentPage - 1) * 5, currentPage * 5).map(event => (
+        }).slice((currentPage - 1) * 5, currentPage * 5).map(event => {
+          const isPast = (event.status || '').toLowerCase() === 'completed' || (event.status || '').toLowerCase() === 'past';
+          return (
           <div key={event.id} className="event-card">
             <div className="event-header">
               <h4>{event.title}</h4>
@@ -155,16 +157,25 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
             </div>
             <div className="event-actions">
               <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }}>Details</button>
-              <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }}>Edit</button>
+              <button
+                className="btn-secondary"
+                onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }}
+                disabled={isPast}
+                title={isPast ? 'Cannot edit past events' : 'Edit event'}
+              >
+                Edit
+              </button>
               <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
       {(() => {
         const filtered = events.filter(event => {
+          const status = (event.status || '').toLowerCase();
           const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+          const matchesFilter = filterStatus === 'all' ? true : (filterStatus === 'past' ? status === 'past' || status === 'completed' : status === filterStatus);
           return matchesSearch && matchesFilter;
         });
         return filtered.length > 5 && (
@@ -193,10 +204,13 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
           </thead>
           <tbody>
             {events.filter(event => {
+              const status = (event.status || '').toLowerCase();
               const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-              const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+              const matchesFilter = filterStatus === 'all' ? true : (filterStatus === 'past' ? status === 'past' || status === 'completed' : status === filterStatus);
               return matchesSearch && matchesFilter;
-            }).slice((currentPage - 1) * 10, currentPage * 10).map(event => (
+            }).slice((currentPage - 1) * 10, currentPage * 10).map(event => {
+              const isPast = (event.status || '').toLowerCase() === 'completed' || (event.status || '').toLowerCase() === 'past';
+              return (
               <tr key={event.id}>
                 <td>{event.title}</td>
                 <td>{new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
@@ -206,18 +220,20 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
                 <td><span className={`status-badge ${event.status}`}>{event.status}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
-                  <button className="btn-secondary" onClick={() => { setEditEventData(event); setShowEditModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>Edit</button>
+                  <button className="btn-secondary" onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }} disabled={isPast} style={{ padding: '6px 12px', fontSize: '13px' }} title={isPast ? 'Cannot edit past events' : 'Edit event'}>Edit</button>
                   <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
       {(() => {
         const filtered = events.filter(event => {
+          const status = (event.status || '').toLowerCase();
           const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || event.location.toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesFilter = filterStatus === 'all' ? true : event.status === filterStatus;
+          const matchesFilter = filterStatus === 'all' ? true : (filterStatus === 'past' ? status === 'past' || status === 'completed' : status === filterStatus);
           return matchesSearch && matchesFilter;
         });
         return filtered.length > 10 && (
@@ -248,9 +264,7 @@ const EditEventModal = ({ event, onClose }) => {
     date: event.date || '',
     time: event.time || '',
     location: event.location || '',
-    capacity: event.capacity || '',
-    category: event.category || '',
-    status: event.status || 'upcoming'
+    capacity: event.capacity || ''
   });
 
   const handleSubmit = (e) => {
@@ -314,41 +328,14 @@ const EditEventModal = ({ event, onClose }) => {
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             />
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Capacity *</label>
-              <input
-                type="number"
-                required
-                value={formData.capacity}
-                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Category</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                <option value="">Select category</option>
-                <option value="conference">Conference</option>
-                <option value="workshop">Workshop</option>
-                <option value="seminar">Seminar</option>
-                <option value="meetup">Meetup</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-          </div>
           <div className="form-group">
-            <label>Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="past">Past</option>
-            </select>
+            <label>Capacity *</label>
+            <input
+              type="number"
+              required
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+            />
           </div>
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
