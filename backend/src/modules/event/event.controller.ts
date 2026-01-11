@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { RegisterForEventDto } from './dto/register-event.dto';
@@ -80,5 +81,16 @@ export class EventController {
   async cancelRegistration(@Param('registrationId') registrationId: string) {
     await this.svc.cancelRegistration(Number(registrationId));
     return { message: 'Registration cancelled successfully' };
+  }
+
+  @Post(':registrationId/send-ticket')
+  @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send ticket PNG to attendee email' })
+  async sendTicket(@Param('registrationId') registrationId: string, @UploadedFile() file: any) {
+    if (!file || !file.buffer) throw new Error('No file uploaded');
+    const sent = await this.svc.sendTicketByEmail(Number(registrationId), file.buffer, file.originalname || 'ticket.png');
+    return { success: sent };
   }
 }

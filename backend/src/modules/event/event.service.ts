@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from '../../typeorm/entities/event';
 import { EventAttendees } from '../../typeorm/entities/event-attendees';
+import { Attendees } from '../../typeorm/entities/attendees';
+import { Admin } from '../../typeorm/entities/admin';
+import { EmailService } from '../email/email.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { RegisterForEventDto } from './dto/register-event.dto';
 
@@ -13,6 +16,11 @@ export class EventService {
     private readonly eventRepo: Repository<Event>,
     @InjectRepository(EventAttendees)
     private readonly eventAttendeesRepo: Repository<EventAttendees>,
+    @InjectRepository(Attendees)
+    private readonly attendeeRepo: Repository<Attendees>,
+    @InjectRepository(Admin)
+    private readonly adminRepo: Repository<Admin>,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(createEventDto: CreateEventDto) {
@@ -106,6 +114,35 @@ export class EventService {
     // Update event registered count
     await this.eventRepo.increment({ id: dto.eventId }, 'registered', 1);
 
+    // Fire-and-forget email: attempt to send registration details to the attendee's email
+    (async () => {
+      try {
+        let recipientEmail: string | undefined;
+        let recipientName: string | undefined;
+        if (dto.attendeeId) {
+          const at = await this.attendeeRepo.findOne({ where: { id: dto.attendeeId } });
+          if (at) {
+            recipientEmail = at.email;
+            recipientName = `${at.firstName} ${at.lastName}`.trim();
+          }
+        } else if (dto.adminId) {
+          const ad = await this.adminRepo.findOne({ where: { id: dto.adminId } });
+          if (ad) {
+            recipientEmail = ad.email;
+            recipientName = `${ad.firstName} ${ad.lastName}`.trim();
+          }
+        }
+
+        // reload event to ensure latest fields
+        const ev = await this.eventRepo.findOne({ where: { id: dto.eventId } });
+        if (recipientEmail && ev) {
+          await this.emailService.sendRegistrationEmail(ev, saved, recipientEmail);
+        }
+      } catch (err) {
+        console.error('Failed to send registration email', err);
+      }
+    })();
+
     return saved;
   }
 
@@ -162,6 +199,25 @@ export class EventService {
     }
     registration.status = 'active';
     return this.eventAttendeesRepo.save(registration);
+  }
+
+  async sendTicketByEmail(registrationId: number, buffer: Buffer, filename: string) {
+    const registration = await this.eventAttendeesRepo.findOne({ where: { id: registrationId } });
+    if (!registration) throw new NotFoundException('Registration not found');
+    const ev = await this.eventRepo.findOne({ where: { id: registration.eventId } });
+    if (!ev) throw new NotFoundException('Event not found');
+    // determine recipient email
+    let recipientEmail: string | undefined = undefined;
+    if (registration.attendeeId) {
+      const at = await this.attendeeRepo.findOne({ where: { id: registration.attendeeId } });
+      if (at) recipientEmail = at.email;
+    } else if (registration.adminId) {
+      const ad = await this.adminRepo.findOne({ where: { id: registration.adminId } });
+      if (ad) recipientEmail = ad.email;
+    }
+    // send using EmailService
+    await this.emailService.sendRegistrationWithAttachment(ev, registration, buffer, filename, recipientEmail);
+    return true;
   }
 }
 
