@@ -91,7 +91,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
   // Load events created by the currently logged-in user so this page shows that user's events
   useEffect(() => {
-    const userId = localStorage.getItem('userId');
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
     if (!userId) return;
     const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -141,7 +141,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
   // Show events created by the currently logged-in user (if any)
   const currentRole = authService.getRole();
-  const currentUserId = localStorage.getItem('userId');
+  const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
   const visibleEvents = currentUserId ? events.filter(e => String(e.createdBy) === String(currentUserId)) : events;
 
   const filteredEvents = visibleEvents.filter(event => {
@@ -196,7 +196,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           registered: 0,
           status: (new Date() < start) ? 'upcoming' : ((new Date() >= start && new Date() <= end) ? 'ongoing' : 'completed'),
           description: newEvent.description || '',
-          createdBy: localStorage.getItem('userId') || '1',
+          createdBy: sessionStorage.getItem('userId') || localStorage.getItem('userId'),
           createdByName: `${localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''} ${localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || ''}`.trim() || 'Organizer',
           createdByFirstName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '',
           createdByLastName: localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || '',

@@ -19,7 +19,8 @@ const Home = ({ onRedirectToEdit, onViewActiveEvent, onCreateEvent, redirectToEv
   const [organizerEvents, setOrganizerEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [eventsError, setEventsError] = useState(null);
-  const currentUserId = localStorage.getItem('userId') || '1';
+  // Read userId from sessionStorage first (LoginPage stores it there), fallback to localStorage
+  const currentUserId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
 
   useEffect(() => {
     const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -612,8 +613,23 @@ const EditEventModal = ({ event, onClose, onSave }) => {
   const [description, setDescription] = useState(event.description || '');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    // Prevent opening edit modal for events not owned by the current user
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
+    if (String(event.createdBy) !== String(userId)) {
+      Swal.fire({ icon: 'warning', title: 'Unauthorized', text: 'You are not allowed to edit this event.', confirmButtonColor: '#0f766e' });
+      onClose && onClose();
+    }
+  }, [event, onClose]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Ensure only the event owner can submit edits
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
+    if (String(event.createdBy) !== String(userId)) {
+      Swal.fire({ icon: 'warning', title: 'Unauthorized', text: 'You are not allowed to edit this event.', confirmButtonColor: '#0f766e' });
+      return;
+    }
     if (!title.trim() || !startDate || !startHour || !startMinute || !startAMPM || !endDate || !endHour || !endMinute || !endAMPM || !location.trim() || !capacity) {
       Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Please fill all required fields.', confirmButtonColor: '#0f766e' });
       return;

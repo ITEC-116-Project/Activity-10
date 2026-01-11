@@ -49,8 +49,12 @@ export function deriveStatusKey(event) {
     if (isNaN(baseDate.getTime())) return event.status || 'upcoming';
     const dateOnly = baseDate.toISOString().slice(0, 10);
 
-    const start = new Date(`${dateOnly}T${startT}`);
-    const end = new Date(`${dateOnly}T${endT}`);
+  // Build start/end in local timezone to avoid ISO string timezone parsing issues
+  const base = new Date(dateStr);
+  const [sH, sM] = startT.split(':').map(Number);
+  const [eH, eM] = endT.split(':').map(Number);
+  const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), sH, sM);
+  const end = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eH, eM);
     const now = new Date();
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return event.status || 'upcoming';
     if (now > end) return 'completed';
@@ -111,8 +115,11 @@ export function displayStatusLabel(event) {
     const baseDate = new Date(dateStr);
     if (isNaN(baseDate.getTime())) return event.status ? String(event.status).charAt(0).toUpperCase() + String(event.status).slice(1) : 'Upcoming';
     const dateOnly = baseDate.toISOString().slice(0, 10);
-    const start = new Date(`${dateOnly}T${startT}`);
-    const end = new Date(`${dateOnly}T${endT}`);
+  const base = new Date(dateStr);
+  const [sH, sM] = startT.split(':').map(Number);
+  const [eH, eM] = endT.split(':').map(Number);
+  const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), sH, sM);
+  const end = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eH, eM);
     const now = new Date();
   if (isNaN(start.getTime()) || isNaN(end.getTime())) return event.status ? String(event.status).charAt(0).toUpperCase() + String(event.status).slice(1) : 'Upcoming';
   if (now > end) return 'Completed';

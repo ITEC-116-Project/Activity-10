@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { deriveStatusKey } from '../../shared/utils/eventStatus';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
 
@@ -41,27 +42,59 @@ const MyTickets = () => {
     try {
       const stored = localStorage.getItem('activeEvent');
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        // only treat stored event as active when it's actually ongoing
+        if (deriveStatusKey(parsed) === 'ongoing' || parsed.status === 'ongoing') return parsed;
       }
     } catch { /* ignore */ }
-    return {
-      id: 2,
-      title: 'Web Development Workshop',
-      date: '2026-01-20',
-      time: '14:00 - 18:00',
-      location: 'BGC Innovation Hub',
-      capacity: 100,
-      registered: 87,
-      status: 'ongoing',
-      description: 'Hands-on workshop focusing on React, TypeScript, and Vite best practices.'
-    };
+    return null; // no active event by default
   });
+  const [activeEvents, setActiveEvents] = useState([]);
+
+  // Fetch the active event from the server (prefer events created by the logged-in user)
+  // helper to fetch active event; exported for manual refresh button below
+  const fetchActiveEvent = async () => {
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
+    const url = userId ? `${base}/events/by-creator/${userId}` : `${base}/events`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+  const ongoingList = list.filter(e => (deriveStatusKey(e) === 'ongoing' || e.status === 'ongoing') && !isEventEnded(e));
+      if (ongoingList.length > 0) {
+        setActiveEvents(ongoingList);
+        setActiveEvent(prev => {
+          // keep current selection if still present
+          const currentId = prev && prev.id;
+          const keep = ongoingList.find(e => String(e.id) === String(currentId));
+          const chosen = keep || ongoingList[0];
+          try { localStorage.setItem('activeEvent', JSON.stringify(chosen)); } catch {}
+          return chosen;
+        });
+      } else {
+        setActiveEvents([]);
+        setActiveEvent(null);
+        try { localStorage.removeItem('activeEvent'); } catch {}
+      }
+    } catch (err) {
+      console.error('Failed to load active event', err);
+      setActiveEvent(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveEvent();
+    const poll = setInterval(fetchActiveEvent, 60_000);
+    return () => clearInterval(poll);
+  }, []);
 
   const [participants, setParticipants] = useState(() => {
     try {
       const raw = localStorage.getItem('myTickets');
       const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.filter(t => t.eventId === activeEvent.id);
+      return activeEvent && activeEvent.id ? tickets.filter(t => t.eventId === activeEvent.id) : [];
     } catch {
       return [];
     }
@@ -69,13 +102,165 @@ const MyTickets = () => {
 
   useEffect(() => {
     // Update participants list whenever activeEvent changes
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      setParticipants(tickets.filter(t => t.eventId === activeEvent.id));
-    } catch {
+    if (!activeEvent) {
       setParticipants([]);
+      return;
     }
+
+    const fetchParticipantsForActive = async (eventId) => {
+      const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      try {
+        const res = await fetch(`${base}/events/${eventId}/attendees`);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        const mapped = list.map(a => ({
+          id: a.id,
+          userName: a.attendeeName || (a.attendee && (a.attendee.firstName ? `${a.attendee.firstName} ${a.attendee.lastName}` : a.attendee.username)) || 'Attendee',
+          email: (a.attendee && a.attendee.email) || (a.admin && a.admin.email) || '',
+          ticketId: a.ticketCode,
+          registeredAt: a.registeredAt,
+          status: a.status
+        }));
+        setParticipants(mapped);
+        const initialChecked = new Set(list.filter(x => x.status && x.status !== 'inactive').map(x => x.id));
+        setCheckedInParticipants(initialChecked);
+      } catch (err) {
+        console.error('Failed to load participants from server, falling back to local', err);
+        try {
+          const raw = localStorage.getItem('myTickets');
+          const tickets = raw ? JSON.parse(raw) : [];
+          setParticipants(tickets.filter(t => t.eventId === eventId));
+        } catch {
+          setParticipants([]);
+        }
+      }
+    };
+
+    fetchParticipantsForActive(activeEvent.id);
+  }, [activeEvent]);
+
+  // allow manual refresh of participants
+  const refreshParticipants = () => {
+    if (!activeEvent) return;
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    fetch(`${base}/events/${activeEvent.id}/attendees`).then(async (res) => {
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      const mapped = list.map(a => ({
+        id: a.id,
+        userName: a.attendeeName || (a.attendee && (a.attendee.firstName ? `${a.attendee.firstName} ${a.attendee.lastName}` : a.attendee.username)) || 'Attendee',
+        email: (a.attendee && a.attendee.email) || (a.admin && a.admin.email) || '',
+        ticketId: a.ticketCode,
+        registeredAt: a.registeredAt,
+        status: a.status
+      }));
+      setParticipants(mapped);
+      const initialChecked = new Set(list.filter(x => x.status && x.status !== 'inactive').map(x => x.id));
+      setCheckedInParticipants(initialChecked);
+    }).catch((err) => {
+      console.error('Failed to refresh participants', err);
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not refresh participants', confirmButtonColor: '#ef4444' });
+    });
+  };
+
+  // When user selects a different active event from the list
+  const selectActiveEvent = (ev) => {
+    // guard against selecting an event that's already ended
+    if (isEventEnded(ev)) {
+      Swal.fire({ icon: 'warning', title: 'Event Ended', text: 'This event has already ended and cannot be selected.', confirmButtonColor: '#0f766e' });
+      fetchActiveEvent();
+      return;
+    }
+    setActiveEvent(ev);
+    try { localStorage.setItem('activeEvent', JSON.stringify(ev)); } catch {}
+  };
+
+  // Determine if an event's end date/time has already passed
+  const isEventEnded = (ev) => {
+    if (!ev) return true;
+    // prefer explicit endDate
+    if (ev.endDate) {
+      const d = new Date(ev.endDate);
+      if (!isNaN(d.getTime())) return d.getTime() <= Date.now();
+    }
+    try {
+      if (ev.date && ev.time) {
+        const parts = ev.time.split(' - ').map(s => s.trim());
+        const endPart = parts[1] || parts[0];
+        const m = endPart.match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+        if (m) {
+          let hour = Number(m[1]);
+          const minute = m[2];
+          const ampm = m[3];
+          if (ampm) {
+            if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+            if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+          }
+          let dateOnly = ev.date;
+          if (dateOnly.includes('T')) dateOnly = dateOnly.split('T')[0];
+          const iso = `${dateOnly}T${String(hour).padStart(2,'0')}:${minute}:00`;
+          const d2 = new Date(iso);
+          if (!isNaN(d2.getTime())) return d2.getTime() <= Date.now();
+        }
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
+  // Clear or refresh active event when its end time passes
+  useEffect(() => {
+    let timerId;
+    const getEndDate = (ev) => {
+      if (!ev) return null;
+      if (ev.endDate) {
+        const d = new Date(ev.endDate);
+        if (!isNaN(d.getTime())) return d;
+      }
+      // fallback to parsing end time from ev.time and ev.date
+      try {
+        if (ev.date && ev.time) {
+          const parts = ev.time.split(' - ').map(s => s.trim());
+          const endPart = parts[1] || parts[0];
+          const m = endPart.match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+          if (m) {
+            let hour = Number(m[1]);
+            const minute = m[2];
+            const ampm = m[3];
+            if (ampm) {
+              if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+              if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+            }
+            let dateOnly = ev.date;
+            if (dateOnly.includes('T')) dateOnly = dateOnly.split('T')[0];
+            const iso = `${dateOnly}T${String(hour).padStart(2,'0')}:${minute}:00`;
+            const d2 = new Date(iso);
+            if (!isNaN(d2.getTime())) return d2;
+          }
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    };
+
+    if (!activeEvent) return undefined;
+    const endDt = getEndDate(activeEvent);
+    if (!endDt) return undefined;
+    const now = new Date();
+    if (endDt.getTime() <= now.getTime()) {
+      // already ended - refresh list to remove it
+      fetchActiveEvent();
+      return undefined;
+    }
+    const ms = endDt.getTime() - now.getTime() + 500; // small buffer
+    timerId = setTimeout(() => {
+      fetchActiveEvent();
+    }, ms);
+    return () => clearTimeout(timerId);
   }, [activeEvent]);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -117,6 +302,10 @@ const MyTickets = () => {
   const currentParticipants = filteredParticipants.slice(startIndex, startIndex + itemsPerPage);
 
   const startCamera = async () => {
+    if (!activeEvent) {
+      Swal.fire({ icon: 'warning', title: 'No Active Event', text: 'There is no active event to scan.', confirmButtonColor: '#0f766e' });
+      return;
+    }
     try {
       // Ensure jsQR is available before starting camera
       await loadJsQR();
@@ -324,6 +513,10 @@ const MyTickets = () => {
   };
 
   const exportPDF = () => {
+    if (!activeEvent) {
+      Swal.fire({ icon: 'warning', title: 'No Active Event', text: 'There is no active event to export.', confirmButtonColor: '#0f766e' });
+      return;
+    }
     const { jsPDF } = window;
     if (!jsPDF) {
       Swal.fire({
@@ -383,90 +576,146 @@ const MyTickets = () => {
         <h2>Active Event - On-Site Check-In</h2>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '30px' }}>
-        {/* Left: Event Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f766e', fontSize: '24px' }}>{activeEvent.title}</h3>
-            {activeEvent.description && (
-              <div style={{ padding: '15px', backgroundColor: '#f0f9f8', borderLeft: '4px solid #0f766e', borderRadius: '4px' }}>
-                <p style={{ margin: '0', color: '#333', lineHeight: '1.6' }}>{activeEvent.description}</p>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+      {activeEvent ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '30px' }}>
+          {/* Left: Event Details */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* If there are multiple ongoing events, allow selection */}
+                {activeEvents && activeEvents.length > 1 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {activeEvents.map(ev => (
+                      <button
+                        key={ev.id}
+                        onClick={() => selectActiveEvent(ev)}
+                        className={String(ev.id) === String(activeEvent?.id) ? 'btn-primary' : 'btn-secondary'}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        {ev.title} <span style={{ marginLeft: '8px', opacity: 0.8 }}>· {new Date(ev.date).toLocaleDateString()}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
             <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}><span className={`status-badge ${activeEvent.status}`}>{activeEvent.status}</span></p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{activeEvent.registered} / {activeEvent.capacity}</p>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity Progress</p>
-              <div className="progress-bar" style={{ marginTop: '8px' }}>
-                <div
-                  className="progress-fill"
-                  style={{ width: `${(activeEvent.registered / activeEvent.capacity) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-
-          <hr style={{ margin: '10px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{new Date(activeEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-            <div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Time</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{activeEvent.time}</p>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</p>
-              <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{activeEvent.location}</p>
-            </div>
-          </div>
-          {/* Metrics row under Location - compact size */}
-          {(() => {
-            const active = checkedInParticipants.size;
-            const total = participants.length;
-            const inactive = Math.max(total - active, 0);
-            const avg = total ? Math.round((active / total) * 100) : 0;
-            const cardStyle = {
-              background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)',
-              color: 'white',
-              borderRadius: '10px',
-              padding: '8px 10px',
-              minWidth: '120px'
-            };
-            const labelStyle = { margin: 0, fontSize: '10px', opacity: 0.9 };
-            const valueStyle = { margin: '2px 0 0 0', fontSize: '16px', fontWeight: 700 };
-            return (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: '10px', marginTop: '10px' }}>
-                <div style={cardStyle}>
-                  <p style={labelStyle}>Active</p>
-                  <p style={valueStyle}>{active}</p>
+              <h3 style={{ margin: '0 0 15px 0', color: '#0f766e', fontSize: '24px' }}>{activeEvent.title}</h3>
+              {activeEvent.description && (
+                <div style={{ padding: '15px', backgroundColor: '#f0f9f8', borderLeft: '4px solid #0f766e', borderRadius: '4px' }}>
+                  <p style={{ margin: '0', color: '#333', lineHeight: '1.6' }}>{activeEvent.description}</p>
                 </div>
-                <div style={cardStyle}>
-                  <p style={labelStyle}>Inactive</p>
-                  <p style={valueStyle}>{inactive}</p>
-                </div>
-                <div style={cardStyle}>
-                  <p style={labelStyle}>Avg. Active</p>
-                  <p style={valueStyle}>{avg}%</p>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}><span className={`status-badge ${activeEvent.status}`}>{activeEvent.status}</span></p>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{activeEvent.registered} / {activeEvent.capacity}</p>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity Progress</p>
+                <div className="progress-bar" style={{ marginTop: '8px' }}>
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${(activeEvent.registered / activeEvent.capacity) * 100}%` }}
+                  ></div>
                 </div>
               </div>
-            );
-          })()}
-        </div>
+            </div>
 
-        {/* Right: Camera Feed */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <hr style={{ margin: '10px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{new Date(activeEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Time</p>
+                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{activeEvent.time}</p>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</p>
+                <p style={{ margin: '0', fontSize: '15px', color: '#333' }}>{activeEvent.location}</p>
+              </div>
+                {(() => {
+                  // show end date/time if available or parseable
+                  const getEnd = (ev) => {
+                    if (!ev) return null;
+                    if (ev.endDate) {
+                      const d = new Date(ev.endDate);
+                      if (!isNaN(d.getTime())) return d;
+                    }
+                    try {
+                      if (ev.date && ev.time) {
+                        const parts = ev.time.split(' - ').map(s => s.trim());
+                        const endPart = parts[1] || parts[0];
+                        const m = endPart.match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+                        if (m) {
+                          let hour = Number(m[1]);
+                          const minute = m[2];
+                          const ampm = m[3];
+                          if (ampm) {
+                            if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+                            if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+                          }
+                          let dateOnly = ev.endDate || ev.date;
+                          if (dateOnly.includes('T')) dateOnly = dateOnly.split('T')[0];
+                          const iso = `${dateOnly}T${String(hour).padStart(2,'0')}:${minute}:00`;
+                          const d2 = new Date(iso);
+                          if (!isNaN(d2.getTime())) return d2;
+                        }
+                      }
+                    } catch {}
+                    return null;
+                  };
+                  const endDt = getEnd(activeEvent);
+                  if (!endDt) return null;
+                  return (
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>End</p>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{endDt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {endDt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  );
+                })()}
+            </div>
+            {/* Metrics row under Location - compact size */}
+            {(() => {
+              const active = checkedInParticipants.size;
+              const total = participants.length;
+              const inactive = Math.max(total - active, 0);
+              const avg = total ? Math.round((active / total) * 100) : 0;
+              const cardStyle = {
+                background: 'linear-gradient(135deg,#0b1e36 0%, #0f766e 100%)',
+                color: 'white',
+                borderRadius: '10px',
+                padding: '8px 10px',
+                minWidth: '120px'
+              };
+              const labelStyle = { margin: 0, fontSize: '10px', opacity: 0.9 };
+              const valueStyle = { margin: '2px 0 0 0', fontSize: '16px', fontWeight: 700 };
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                  <div style={cardStyle}>
+                    <p style={labelStyle}>Active</p>
+                    <p style={valueStyle}>{active}</p>
+                  </div>
+                  <div style={cardStyle}>
+                    <p style={labelStyle}>Inactive</p>
+                    <p style={valueStyle}>{inactive}</p>
+                  </div>
+                  <div style={cardStyle}>
+                    <p style={labelStyle}>Avg. Active</p>
+                    <p style={valueStyle}>{avg}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Right: Camera Feed */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{
             border: '3px solid #0f766e',
             borderRadius: '12px',
@@ -521,8 +770,19 @@ const MyTickets = () => {
               📱 Start Camera
             </button>
           )}
-        </div>
       </div>
+    </div>
+  ) : (
+    <div style={{ padding: '40px', textAlign: 'center', color: '#666', marginBottom: '30px' }}>
+      <h3 style={{ marginBottom: '8px' }}>No Active Event</h3>
+      <p style={{ margin: 0 }}>There is no ongoing event at the moment.</p>
+      <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
+        <button className="btn-primary" onClick={fetchActiveEvent}>Refresh</button>
+        <button className="btn-secondary" onClick={() => { try { window.location.href = '/events'; } catch {} }}>Go to Events</button>
+      </div>
+    </div>
+  )}
+      
 
       {/* Participants Table */}
       <div>
@@ -545,6 +805,15 @@ const MyTickets = () => {
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             📄 PDF
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={refreshParticipants}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            disabled={!activeEvent}
+            title={!activeEvent ? 'No active event' : 'Refresh participants'}
+          >
+            ↻ Refresh
           </button>
         </div>
 
