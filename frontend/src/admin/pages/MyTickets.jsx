@@ -40,6 +40,7 @@ const MyTickets = () => {
           time: reg.event?.time,
           location: reg.event?.location,
           status: reg.status || reg.event?.status || 'inactive',
+          eventStatus: reg.event?.status || 'upcoming',
           registeredAt: reg.registeredAt,
           userName: reg.attendeeName,
           qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({ ticketCode: reg.ticketCode, eventId: reg.eventId, eventTitle: reg.event?.title, userName: reg.attendeeName }))}`,
@@ -236,8 +237,15 @@ const MyTickets = () => {
                 <button className="btn-secondary" onClick={() => downloadTicket(t)}>Download</button>
                 <button 
                   className="btn-secondary" 
-                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: 'white' }}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', 
+                    color: 'white',
+                    opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
+                    cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
+                  }}
                   onClick={() => handleCancelRegistration(t.id)}
+                  disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
+                  title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
                 >
                   Cancel
                 </button>
@@ -283,8 +291,17 @@ const MyTickets = () => {
                       <button className="btn-secondary" onClick={() => downloadTicket(t)} style={{ padding: '5px 10px', fontSize: '12px', marginRight: '5px' }}>Download</button>
                       <button 
                         className="btn-secondary" 
-                        style={{ background: '#dc2626', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                        style={{ 
+                          background: '#dc2626', 
+                          color: 'white', 
+                          padding: '5px 10px', 
+                          fontSize: '12px',
+                          opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
+                          cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
+                        }}
                         onClick={() => handleCancelRegistration(t.id)}
+                        disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
+                        title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
                       >
                         Cancel
                       </button>

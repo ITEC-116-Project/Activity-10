@@ -67,6 +67,7 @@ const MyTickets = () => {
             time: event?.time || '',
             location: event?.location || '',
             status: event?.status || 'upcoming',
+            eventStatus: event?.status || 'upcoming',
             registeredAt: reg.registeredAt,
             organizerName: `${event?.createdByFirstName || ''} ${event?.createdByLastName || ''}`.trim() || event?.createdByName || 'Organizer',
             organizerEmail: event?.createdByEmail || 'organizer@email.com',
@@ -293,8 +294,15 @@ const MyTickets = () => {
                 <button className="btn-secondary" onClick={() => downloadTicket(t)}>Download</button>
                 <button 
                   className="btn-secondary" 
-                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: 'white' }}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', 
+                    color: 'white',
+                    opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
+                    cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
+                  }}
                   onClick={() => handleCancelRegistration(t.id)}
+                  disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
+                  title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
                 >
                   Cancel
                 </button>
@@ -341,8 +349,17 @@ const MyTickets = () => {
                     <button className="btn-secondary" onClick={() => downloadTicket(t)} style={{ padding: '5px 10px', fontSize: '12px', marginRight: '5px' }}>Download</button>
                     <button 
                       className="btn-secondary" 
-                      style={{ background: '#dc2626', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                      style={{ 
+                        background: '#dc2626', 
+                        color: 'white', 
+                        padding: '5px 10px', 
+                        fontSize: '12px',
+                        opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
+                        cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
+                      }}
                       onClick={() => handleCancelRegistration(t.id)}
+                      disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
+                      title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
                     >
                       Cancel
                     </button>
