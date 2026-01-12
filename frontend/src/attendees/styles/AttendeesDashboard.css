@@ -239,6 +239,16 @@
   align-items: center;
 }
 
+.modal-header-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header-row h2 {
+  margin-bottom: 0;
+}
+
 .modal-header h2 {
   margin: 0 0 8px 0;
   color: #0f766e;

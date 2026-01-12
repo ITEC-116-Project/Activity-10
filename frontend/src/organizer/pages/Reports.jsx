@@ -318,12 +318,15 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
   useEffect(() => {
     const fetchAttendees = async () => {
       setLoading(true);
       const data = await getAttendees(event.id);
       setAttendees(data);
+      setPage(1);
       setLoading(false);
     };
     fetchAttendees();
@@ -334,6 +337,13 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
     (a.ticketCode || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredAttendees.length / PAGE_SIZE);
+  const currentPage = totalPages ? Math.min(page, totalPages) : 1;
+  const paginatedAttendees = filteredAttendees.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -341,7 +351,7 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '1250px', width: '96vw' }}
       >
-        <div className="modal-header">
+        <div className="modal-header modal-header-row">
           <h2>{event.title}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
@@ -406,7 +416,10 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
                 type="text"
                 placeholder="Search by name, email, or ticket ID..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 style={{ flex: 1, minWidth: '240px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
               />
               <button className="btn-secondary" onClick={onDownload} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>📄 PDF</button>
@@ -427,7 +440,7 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
                       <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Loading participants...</td>
                     </tr>
                   ) : filteredAttendees.length > 0 ? (
-                    filteredAttendees.map(a => (
+                    paginatedAttendees.map(a => (
                       <tr key={a.id}>
                         <td><strong>{a.attendeeName || 'N/A'}</strong></td>
                         <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{a.ticketCode || 'N/A'}</td>
@@ -453,6 +466,11 @@ const EventDetailsModal = ({ event, getAttendees, onClose, onDownload }) => {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div style={{ marginTop: '16px' }}>
+                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+              </div>
+            )}
           </div>
         </div>
 

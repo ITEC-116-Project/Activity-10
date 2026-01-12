@@ -270,6 +270,59 @@ const EventDetailsModal = ({ event, onClose, onRedirectToEdit }) => {
     }
   });
 
+  useEffect(() => {
+    const seedFromLocal = () => {
+      try {
+        const raw = localStorage.getItem('myTickets');
+        const tickets = raw ? JSON.parse(raw) : [];
+        return tickets.some(t => t.eventId === event.id && t.userName === userName);
+      } catch {
+        return false;
+      }
+    };
+
+    let isActive = true;
+    setIsRegistered(seedFromLocal());
+
+    const verifyRegistration = async () => {
+      try {
+        const adminId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+        if (!adminId) return;
+
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${base}/events/admin/${adminId}/registrations`, { headers });
+        if (!response.ok) {
+          throw new Error('Failed to verify registration status');
+        }
+
+        const registrations = await response.json();
+        const alreadyRegistered = Array.isArray(registrations)
+          ? registrations.some((registration) => {
+              const regEventId = registration.eventId ?? registration.event?.id;
+              return Number(regEventId) === Number(event.id);
+            })
+          : false;
+
+        if (isActive) {
+          setIsRegistered(alreadyRegistered);
+        }
+      } catch (error) {
+        console.error('Failed to check registration status', error);
+      }
+    };
+
+    verifyRegistration();
+    return () => {
+      isActive = false;
+    };
+  }, [event.id, userName]);
+
   const handleEdit = () => {
     onRedirectToEdit(event);
     onClose();
@@ -362,7 +415,7 @@ const EventDetailsModal = ({ event, onClose, onRedirectToEdit }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+        <div className="modal-header modal-header-row">
           <h2>{event.title}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>

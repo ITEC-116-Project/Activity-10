@@ -317,7 +317,7 @@ const TicketDetailsModal = ({ ticket, onClose }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+        <div className="modal-header modal-header-row">
           <h2>{ticket.eventTitle}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
@@ -358,23 +358,6 @@ const TicketDetailsModal = ({ ticket, onClose }) => {
                       <p key={idx} style={{ margin: '4px 0', paddingLeft: '8px', borderLeft: '2px solid #d1fae5' }}>{staffMember}</p>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Attendee Name</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{ticket.userName || '—'}</p>
-              </div>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
-                <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{ticket.email || '—'}</p>
-              </div>
-              {ticket.company && (
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#888', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Company</p>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#333' }}>{ticket.company}</p>
                 </div>
               )}
             </div>

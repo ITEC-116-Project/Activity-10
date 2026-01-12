@@ -274,6 +274,7 @@ const MyTickets = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const scanIntervalRef = useRef(null);
+  const scanPauseTimeoutRef = useRef(null);
 
   const itemsPerPage = 10;
 
@@ -286,6 +287,9 @@ const MyTickets = () => {
       }
       if (scanIntervalRef.current) {
         cancelAnimationFrame(scanIntervalRef.current);
+      }
+      if (scanPauseTimeoutRef.current) {
+        clearTimeout(scanPauseTimeoutRef.current);
       }
     };
   }, []);
@@ -415,6 +419,13 @@ const MyTickets = () => {
     
     // Immediately pause scanning to prevent multiple detections
     setIsScanningPaused(true);
+    if (scanPauseTimeoutRef.current) {
+      clearTimeout(scanPauseTimeoutRef.current);
+    }
+    scanPauseTimeoutRef.current = setTimeout(() => {
+      setIsScanningPaused(false);
+      scanPauseTimeoutRef.current = null;
+    }, 5000);
     
       try {
         // Try to parse as JSON (the QR contains the full ticket object)
@@ -431,7 +442,7 @@ const MyTickets = () => {
 
         // If the QR is for a different event, warn and ignore
         if (scannedData && scannedData.eventId && activeEvent && String(scannedData.eventId) !== String(activeEvent.id)) {
-          Swal.fire({ icon: 'warning', title: 'Wrong Event', text: 'This ticket is for a different event.', confirmButtonColor: '#0f766e' }).then(() => setIsScanningPaused(false));
+          Swal.fire({ icon: 'warning', title: 'Wrong Event', text: 'This ticket is for a different event.', confirmButtonColor: '#0f766e' });
           return;
         }
 
@@ -527,6 +538,11 @@ const MyTickets = () => {
 
         // If found in participants, success
         if (matched) {
+          const alreadyChecked = (matched.id && checkedInParticipants.has(matched.id)) || (matched.status && matched.status !== 'inactive');
+          if (alreadyChecked) {
+            Swal.fire({ icon: 'info', title: 'Already Checked In', text: `${matched.userName || 'Participant'} is already checked in for this event.`, confirmButtonColor: '#0f766e', timer: 3000, timerProgressBar: true });
+            return;
+          }
           handleSuccess(matched, matched.userName);
           return;
         }
@@ -540,7 +556,7 @@ const MyTickets = () => {
 
         // Not found anywhere
         console.log('Attendee not found for QR code:', qrData);
-        Swal.fire({ icon: 'error', title: 'Invalid QR Code', text: 'Attendee not found', confirmButtonColor: '#dc2626', timer: 3000, timerProgressBar: true }).then(() => setIsScanningPaused(false));
+        Swal.fire({ icon: 'error', title: 'Invalid QR Code', text: 'Attendee not found', confirmButtonColor: '#dc2626', timer: 3000, timerProgressBar: true });
     } catch (error) {
       console.error('Error processing QR code:', error);
       setIsScanningPaused(false);

@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { MdDelete, MdFileDownload } from 'react-icons/md';
+import { MdDelete } from 'react-icons/md';
 import Swal from 'sweetalert2';
 import Pagination from '../../components/Pagination';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { deriveStatusKey, displayStatusLabel } from '../../shared/utils/eventStatus';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import CreateEventModal from '../components/CreateEventModal';
 import { authService } from '../../shared/services/authService';
 
@@ -14,7 +12,6 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [editEventData, setEditEventData] = useState(null);
   const [viewMode, setViewMode] = useState('card');
@@ -352,13 +349,26 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       )}
 
       {showDetailsModal && selectedEvent && (
-        <EventDetailsModal event={selectedEvent} computedStatus={displayStatusLabel(selectedEvent)} onClose={() => { setShowDetailsModal(false); setSelectedEvent(null); }} onShowParticipants={() => { setShowDetailsModal(false); setShowParticipantsModal(true); }} />
+        <EventDetailsModal
+          event={selectedEvent}
+          computedStatus={displayStatusLabel(selectedEvent)}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedEvent(null);
+          }}
+        />
       )}
       {showEditModal && editEventData && (
-        <EditEventModal event={editEventData} onClose={() => { setShowEditModal(false); setEditEventData(null); }} />
-      )}
-      {showParticipantsModal && selectedEvent && (
-        <ParticipantsModal event={selectedEvent} onClose={() => { setShowParticipantsModal(false); setSelectedEvent(null); }} />
+        <EditEventModal
+          event={editEventData}
+          onClose={() => { setShowEditModal(false); setEditEventData(null); }}
+          onSave={(updated) => {
+            setEvents(prev => prev.map(ev => String(ev.id) === String(updated.id) ? updated : ev));
+            setShowEditModal(false);
+            setEditEventData(null);
+            try { window.dispatchEvent(new CustomEvent('event:updated', { detail: updated })); } catch {}
+          }}
+        />
       )}
           {showCreateModal && (
             <CreateEventModal onClose={() => setShowCreateModal(false)} onCreate={(data) => { createEvent(data); setShowCreateModal(false); }} />
@@ -367,107 +377,393 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       );
     };
 
-const EditEventModal = ({ event, onClose }) => {
-  const [formData, setFormData] = useState({
-    title: event.title || '',
-    description: event.description || '',
-    date: event.date || '',
-    time: event.time || '',
-    location: event.location || '',
-    capacity: event.capacity || '',
-    category: event.category || ''
-  });
+const EditEventModal = ({ event, onClose, onSave }) => {
+  const parseInitial = (ev) => {
+    const safe = ev || {};
+    let startDate = '';
+    let endDate = '';
+    let startHour = '09', startMinute = '00', startAMPM = 'AM';
+    let endHour = '10', endMinute = '00', endAMPM = 'AM';
+
+    if (safe.date) {
+      const d = new Date(safe.date);
+      if (!isNaN(d.getTime())) startDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    if (safe.endDate) {
+      const d2 = new Date(safe.endDate);
+      if (!isNaN(d2.getTime())) endDate = `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}-${String(d2.getDate()).padStart(2,'0')}`;
+    }
+
+    if (safe.time) {
+      const parts = safe.time.split(' - ').map(s => s.trim());
+      if (parts[0]) {
+        const m = parts[0].match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+        if (m) {
+          startHour = String(Number(m[1])).padStart(2,'0');
+          startMinute = m[2];
+          startAMPM = m[3] ? m[3].toUpperCase() : (Number(m[1])>=12 ? 'PM' : 'AM');
+        }
+      }
+      if (parts[1]) {
+        const m2 = parts[1].match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+        if (m2) {
+          endHour = String(Number(m2[1])).padStart(2,'0');
+          endMinute = m2[2];
+          endAMPM = m2[3] ? m2[3].toUpperCase() : (Number(m2[1])>=12 ? 'PM' : 'AM');
+        }
+      }
+    }
+
+    const today = new Date();
+    if (!startDate) startDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    if (!endDate) endDate = startDate;
+    return { startDate, startHour, startMinute, startAMPM, endDate, endHour, endMinute, endAMPM };
+  };
+
+  const init = parseInitial(event);
+  const todayLocalISO = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const toLocalISO = (isoOrDate) => {
+    if (!isoOrDate) return null;
+    const d = new Date(isoOrDate);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const minDate = todayLocalISO();
+  const [title, setTitle] = useState(event.title || '');
+  const [startDate, setStartDate] = useState(init.startDate);
+  const [startHour, setStartHour] = useState(init.startHour);
+  const [startMinute, setStartMinute] = useState(init.startMinute);
+  const [startAMPM, setStartAMPM] = useState(init.startAMPM);
+  const [endDate, setEndDate] = useState(init.endDate);
+  const [endHour, setEndHour] = useState(init.endHour);
+  const [endMinute, setEndMinute] = useState(init.endMinute);
+  const [endAMPM, setEndAMPM] = useState(init.endAMPM);
+  const [location, setLocation] = useState(event.location || '');
+  const [capacity, setCapacity] = useState(event.capacity || 0);
+  const [description, setDescription] = useState(event.description || '');
+  const [submitting, setSubmitting] = useState(false);
+  const inputStyle = { width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', boxSizing: 'border-box', color: '#111', backgroundColor: '#fff' };
+  const selectStyle = { ...inputStyle, paddingRight: '36px' };
+  const labelStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    fontSize: '13px',
+    color: '#0f766e',
+    fontWeight: 600,
+    textTransform: 'none',
+    letterSpacing: '0.01em'
+  };
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px 32px 16px',
+    borderBottom: '1px solid #e5e7eb'
+  };
+  const bodyStyle = {
+    padding: '24px 32px 32px',
+    display: 'grid',
+    gap: '18px'
+  };
+
+  useEffect(() => {
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
+    if (String(event.createdBy) !== String(userId)) {
+      Swal.fire({ icon: 'warning', title: 'Unauthorized', text: 'You are not allowed to edit this event.', confirmButtonColor: '#0f766e' });
+      onClose && onClose();
+    }
+  }, [event, onClose]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Update event:', formData);
-    onClose();
+    const userId = sessionStorage.getItem('userId') || localStorage.getItem('userId');
+    if (String(event.createdBy) !== String(userId)) {
+      Swal.fire({ icon: 'warning', title: 'Unauthorized', text: 'You are not allowed to edit this event.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+    if (!title.trim() || !startDate || !startHour || !startMinute || !startAMPM || !endDate || !endHour || !endMinute || !endAMPM || !location.trim() || !capacity) {
+      Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Please fill all required fields.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+    const to24 = (hour12, minute, ampm) => {
+      let h = Number(hour12);
+      const m = String(minute).padStart(2,'0');
+      if (ampm === 'AM' && h === 12) h = 0;
+      if (ampm === 'PM' && h !== 12) h = h + 12;
+      return `${String(h).padStart(2,'0')}:${m}`;
+    };
+
+    const startTime24 = to24(startHour, startMinute, startAMPM);
+    const endTime24 = to24(endHour, endMinute, endAMPM);
+    const startISO = new Date(`${startDate}T${startTime24}`).toISOString();
+    const endISO = new Date(`${endDate}T${endTime24}`).toISOString();
+    if (new Date(endISO) <= new Date(startISO)) {
+      Swal.fire({ icon: 'warning', title: 'Invalid dates', text: 'End must be after start.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+    const origDate = event?.date ? toLocalISO(event.date) : null;
+    if (new Date(startDate) < new Date(minDate) && startDate !== origDate) {
+      Swal.fire({ icon: 'warning', title: 'Invalid start date', text: 'Start date cannot be in the past.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+    const startDt = new Date(startISO);
+    const now = new Date();
+    const origISO = event?.date ? new Date(event.date).toISOString() : null;
+    if (startDate === todayLocalISO() && startDt.getTime() < now.getTime() && startISO !== origISO) {
+      Swal.fire({ icon: 'warning', title: 'Invalid start time', text: 'Start time cannot be in the past.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      date: startISO,
+      endDate: endISO,
+      time: `${new Date(`${startDate}T${startTime24}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(`${endDate}T${endTime24}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      location: location.trim(),
+      capacity: Number(capacity) || 0,
+      description: description.trim(),
+    };
+
+    const origEndISO = event?.endDate ? new Date(event.endDate).toISOString() : null;
+    if (endDate === todayLocalISO() && new Date(endISO).getTime() < now.getTime() && endISO !== origEndISO) {
+      Swal.fire({ icon: 'warning', title: 'Invalid end time', text: 'End time cannot be in the past.', confirmButtonColor: '#0f766e' });
+      return;
+    }
+
+    setSubmitting(true);
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/events/${event.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        setSubmitting(false);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      })
+      .then((updated) => {
+        Swal.fire({ icon: 'success', title: 'Updated', text: 'Event updated successfully.', confirmButtonColor: '#0f766e' });
+        onSave && onSave(updated);
+      })
+      .catch((err) => {
+        setSubmitting(false);
+        console.error('Update error', err);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not update event.', confirmButtonColor: '#ef4444' });
+      });
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Edit Event</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+      <div
+        className="modal-content modal-large"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '760px', padding: 0, overflow: 'hidden' }}
+      >
+        <div style={headerStyle}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', color: '#0f766e', fontWeight: 700 }}>Edit Event</h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#6b7280' }}>Update the essentials before you publish changes.</p>
+          </div>
+          <button className="close-button" onClick={onClose} style={{ position: 'static', fontSize: '20px' }}>×</button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Event Title *</label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>Description *</label>
+        <form onSubmit={handleSubmit} style={bodyStyle}>
+          <label style={labelStyle}>
+            Event Title *
+            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
+          <label style={labelStyle}>
+            Description *
             <textarea
-              required
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows="4"
-            />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Date *</label>
-              <input
-                type="date"
-                required
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label>Time *</label>
-              <input
-                type="time"
-                required
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Location *</label>
-            <input
-              type="text"
               required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              style={{ ...inputStyle, minHeight: '110px', resize: 'vertical' }}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add or adjust notes for your attendees"
             />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Capacity *</label>
-              <input
-                type="number"
-                required
-                value={formData.capacity}
-                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-              />
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={labelStyle}>
+                Date *
+                <input type="date" min={minDate} value={startDate} onChange={(e) => {
+                    const v = e.target.value;
+                    setStartDate(v);
+                    if (v > endDate) setEndDate(v);
+                    const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                    if (v === todayLocalISO()) {
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      if (minutes.every(m => new Date(`${v}T${to24(startHour,m,startAMPM)}`).getTime() < Date.now())) {
+                        const found = minutes.find(m => new Date(`${v}T${to24(startHour,m,startAMPM)}`).getTime() >= Date.now());
+                        if (found) setStartMinute(found);
+                      }
+                    }
+                  }} required style={inputStyle} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <select value={startHour} onChange={(e) => {
+                    const v = e.target.value;
+                    setStartHour(v);
+                    const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                    const today = todayLocalISO();
+                    if (startDate === today) {
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      if (minutes.every(m => new Date(`${startDate}T${to24(v,m,startAMPM)}`).getTime() < Date.now())) {
+                        const found = minutes.find(m => new Date(`${startDate}T${to24(v,m,startAMPM)}`).getTime() >= Date.now());
+                        if (found) setStartMinute(found);
+                      }
+                    }
+                }} style={selectStyle}>
+                    {Array.from({ length: 12 }).map((_, i) => {
+                      const v = String(i+1).padStart(2,'0');
+                      const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                      const isHourPast = startDate === todayLocalISO() && minutes.every(m => {
+                        const to24 = (hour12, minute, ampm) => {
+                          let h = Number(hour12);
+                          const mm = String(minute).padStart(2, '0');
+                          if (ampm === 'AM' && h === 12) h = 0;
+                          if (ampm === 'PM' && h !== 12) h = h + 12;
+                          return `${String(h).padStart(2,'0')}:${mm}`;
+                        };
+                        return new Date(`${startDate}T${to24(v,m,startAMPM)}`).getTime() < Date.now();
+                      });
+                      return <option key={v} value={v} disabled={isHourPast}>{v}</option>;
+                    })}
+                </select>
+                <select value={startMinute} onChange={(e) => setStartMinute(e.target.value)} style={selectStyle}>
+                    {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => {
+                      const today = todayLocalISO();
+                      if (startDate !== today) return <option key={m} value={m}>{m}</option>;
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      const t = to24(startHour, m, startAMPM);
+                      const dt = new Date(`${startDate}T${t}`);
+                      const isPast = dt.getTime() < Date.now();
+                      return <option key={m} value={m} disabled={isPast}>{m}</option>;
+                    })}
+                </select>
+                <select value={startAMPM} onChange={(e) => {
+                    const v = e.target.value;
+                    setStartAMPM(v);
+                    const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                    const today = todayLocalISO();
+                    if (startDate === today) {
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      if (minutes.every(m => new Date(`${startDate}T${to24(startHour,m,v)}`).getTime() < Date.now())) {
+                        const found = minutes.find(m => new Date(`${startDate}T${to24(startHour,m,v)}`).getTime() >= Date.now());
+                        if (found) setStartMinute(found);
+                      }
+                    }
+                }} style={selectStyle}>
+                    <option>AM</option>
+                    <option>PM</option>
+                </select>
+              </div>
             </div>
-            <div className="form-group">
-              <label>Category</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                <option value="">Select category</option>
-                <option value="conference">Conference</option>
-                <option value="workshop">Workshop</option>
-                <option value="seminar">Seminar</option>
-                <option value="meetup">Meetup</option>
-                <option value="other">Other</option>
-              </select>
+
+            <div>
+              <label style={labelStyle}>
+                End Date *
+                <input type="date" min={startDate || minDate} value={endDate} onChange={(e) => {
+                    const v = e.target.value;
+                    setEndDate(v);
+                    const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                    const today = todayLocalISO();
+                    if (v === today) {
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      if (minutes.every(m => new Date(`${v}T${to24(endHour,m,endAMPM)}`).getTime() < Date.now())) {
+                        const found = minutes.find(m => new Date(`${v}T${to24(endHour,m,endAMPM)}`).getTime() >= Date.now());
+                        if (found) setEndMinute(found);
+                      }
+                    }
+                }} required style={inputStyle} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <select value={endHour} onChange={(e) => setEndHour(e.target.value)} style={selectStyle}>
+                    {Array.from({ length: 12 }).map((_, i) => {
+                      const v = String(i+1).padStart(2,'0');
+                      const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+                      const isHourPast = endDate === todayLocalISO() && minutes.every(m => {
+                        const to24 = (hour12, minute, ampm) => {
+                          let h = Number(hour12);
+                          const mm = String(minute).padStart(2, '0');
+                          if (ampm === 'AM' && h === 12) h = 0;
+                          if (ampm === 'PM' && h !== 12) h = h + 12;
+                          return `${String(h).padStart(2,'0')}:${mm}`;
+                        };
+                        return new Date(`${endDate}T${to24(v,m,endAMPM)}`).getTime() < Date.now();
+                      });
+                      return <option key={v} value={v} disabled={isHourPast}>{v}</option>;
+                    })}
+                  </select>
+                <select value={endMinute} onChange={(e) => setEndMinute(e.target.value)} style={selectStyle}>
+                    {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => {
+                      const today = todayLocalISO();
+                        if (endDate !== today) return <option key={m} value={m}>{m}</option>;
+                      const to24 = (hour12, minute, ampm) => {
+                        let h = Number(hour12);
+                        const mm = String(minute).padStart(2, '0');
+                        if (ampm === 'AM' && h === 12) h = 0;
+                        if (ampm === 'PM' && h !== 12) h = h + 12;
+                        return `${String(h).padStart(2,'0')}:${mm}`;
+                      };
+                      const t = to24(endHour, m, endAMPM);
+                      const dt = new Date(`${endDate}T${t}`);
+                      const isPast = dt.getTime() < Date.now();
+                      return <option key={m} value={m} disabled={isPast}>{m}</option>;
+                    })}
+                  </select>
+                <select value={endAMPM} onChange={(e) => setEndAMPM(e.target.value)} style={selectStyle}>
+                    <option>AM</option>
+                    <option>PM</option>
+                </select>
+              </div>
             </div>
           </div>
-          {/* Status removed from edit form per request */}
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">Save Changes</button>
+          <label style={labelStyle}>
+            Location *
+            <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} required placeholder="Venue or address" />
+          </label>
+          <label style={labelStyle}>
+            Capacity *
+            <input type="number" min="0" style={inputStyle} value={capacity} onChange={(e) => setCapacity(e.target.value)} required />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+            <button type="button" className="btn-secondary" onClick={onClose} style={{ minWidth: '120px' }}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={submitting} style={{ minWidth: '150px' }}>{submitting ? 'Saving...' : 'Save Changes'}</button>
           </div>
         </form>
       </div>
@@ -476,214 +772,5 @@ const EditEventModal = ({ event, onClose }) => {
 };
 
 
-
-const ParticipantsModal = ({ event, onClose }) => {
-  const [participants, setParticipants] = useState(() => {
-    try {
-      const raw = localStorage.getItem('myTickets');
-      const tickets = raw ? JSON.parse(raw) : [];
-      return tickets.filter(t => t.eventId === event.id);
-    } catch {
-      return [];
-    }
-  });
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [checkedInParticipants, setCheckedInParticipants] = useState(new Set());
-
-  const itemsPerPage = 10;
-
-  const filteredParticipants = participants.filter(p => {
-    const matchesSearch = 
-      p.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.email && p.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      p.ticketId.includes(searchTerm);
-    return matchesSearch;
-  });
-
-  const totalPages = Math.ceil(filteredParticipants.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentParticipants = filteredParticipants.slice(startIndex, startIndex + itemsPerPage);
-
-  const handleCheckIn = (participantId) => {
-    setCheckedInParticipants(prev => new Set([...prev, participantId]));
-    Swal.fire({
-      icon: 'success',
-      title: 'Checked In!',
-      text: 'Participant successfully checked in.',
-      confirmButtonColor: '#0f766e',
-      confirmButtonText: 'OK'
-    });
-  };
-
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    doc.setFontSize(16);
-    doc.setTextColor(15, 118, 110);
-    doc.text(`${event.title} - Attendee List`, 14, 20);
-
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    const eventDate = new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    doc.text(`Date: ${eventDate}`, 14, 28);
-    doc.text(`Location: ${event.location}`, 14, 35);
-    doc.text(`Total Attendees: ${participants.length}`, 14, 42);
-
-    const tableData = participants.map(p => [
-      p.userName,
-      p.email || 'N/A',
-      p.ticketId,
-      new Date(p.registeredAt).toLocaleDateString('en-US'),
-      checkedInParticipants.has(p.id) ? '✓' : '—'
-    ]);
-
-    doc.autoTable({
-      head: [['Name', 'Email', 'Ticket ID', 'Registration Date', 'Check-in']],
-      body: tableData,
-      startY: 50,
-      theme: 'striped',
-      headerStyles: {
-        fillColor: [15, 118, 110],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      margin: { top: 50 }
-    });
-
-    doc.setFontSize(9);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Generated on ${new Date().toLocaleString('en-US')}`, 14, pageHeight - 10);
-
-    doc.save(`${event.title.replace(/\s+/g, '_')}_attendees.pdf`);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Participants - {event.title}</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        <div style={{ padding: '20px 30px' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Search by name, email, or ticket ID..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{ flex: 1, minWidth: '250px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-            />
-            <button 
-              className="btn-secondary"
-              onClick={() => setScannerOpen(!scannerOpen)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              📱 QR Scanner
-            </button>
-            <button 
-              className="btn-secondary"
-              onClick={exportPDF}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <MdFileDownload /> PDF
-            </button>
-          </div>
-
-          {scannerOpen && (
-            <div style={{
-              padding: '15px',
-              backgroundColor: '#f0f9f8',
-              borderRadius: '8px',
-              marginBottom: '20px',
-              border: '2px dashed #0f766e'
-            }}>
-              <p style={{ margin: '0 0 10px 0', fontWeight: '600', color: '#0f766e' }}>📱 QR Code Scanner</p>
-              <p style={{ margin: '0', fontSize: '13px', color: '#666' }}>Click on a participant's QR code to simulate scanning, or use device camera.</p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#999' }}>Note: Enable camera access when prompted by your browser.</p>
-            </div>
-          )}
-
-          <div className="events-table-container">
-            <table className="events-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Ticket ID</th>
-                  <th>Registration Date</th>
-                  <th>Check-in Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentParticipants.length > 0 ? (
-                  currentParticipants.map(p => (
-                    <tr key={p.id}>
-                      <td><strong>{p.userName}</strong></td>
-                      <td>{p.email || '—'}</td>
-                      <td style={{ fontSize: '12px', fontFamily: 'monospace', color: '#0f766e' }}>{p.ticketId}</td>
-                      <td>{new Date(p.registeredAt).toLocaleDateString('en-US')}</td>
-                      <td>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          backgroundColor: checkedInParticipants.has(p.id) ? '#d1fae5' : '#fef3c7',
-                          color: checkedInParticipants.has(p.id) ? '#065f46' : '#92400e'
-                        }}>
-                          {checkedInParticipants.has(p.id) ? '✓ Checked In' : '⏳ Pending'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {!checkedInParticipants.has(p.id) ? (
-                          <button
-                            className="btn-secondary"
-                            onClick={() => handleCheckIn(p.id)}
-                            style={{ padding: '5px 10px', fontSize: '12px' }}
-                          >
-                            Check In
-                          </button>
-                        ) : (
-                          <span style={{ color: '#0f766e', fontWeight: '600' }}>✓ Done</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>
-                      <p style={{ margin: '0', color: '#999' }}>No participants found</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredParticipants.length > itemsPerPage && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          )}
-
-          <div className="modal-actions" style={{ marginTop: '20px' }}>
-            <button className="btn-secondary" onClick={onClose}>Close</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default Events;

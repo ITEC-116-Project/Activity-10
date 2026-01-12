@@ -7,9 +7,10 @@ import { Admin } from '../../typeorm/entities/admin';
 import { EventService } from './event.service';
 import { EventController } from './event.controller';
 import { EmailModule } from '../email/email.module';
+import { Organizer } from '../../typeorm/entities/organizer';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Event, EventAttendees, Attendees, Admin]), EmailModule],
+  imports: [TypeOrmModule.forFeature([Event, EventAttendees, Attendees, Admin, Organizer]), EmailModule],
   providers: [EventService],
   controllers: [EventController],
   exports: [EventService],

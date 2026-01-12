@@ -1,10 +1,11 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Event } from '../../typeorm/entities/event';
 import { EventAttendees } from '../../typeorm/entities/event-attendees';
 import { Attendees } from '../../typeorm/entities/attendees';
 import { Admin } from '../../typeorm/entities/admin';
+import { Organizer } from '../../typeorm/entities/organizer';
 import { EmailService } from '../email/email.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { RegisterForEventDto } from './dto/register-event.dto';
@@ -20,6 +21,8 @@ export class EventService {
     private readonly attendeeRepo: Repository<Attendees>,
     @InjectRepository(Admin)
     private readonly adminRepo: Repository<Admin>,
+    @InjectRepository(Organizer)
+    private readonly organizerRepo: Repository<Organizer>,
     private readonly emailService: EmailService,
   ) {}
 
@@ -45,6 +48,7 @@ export class EventService {
         this.eventRepo.save(ev).catch(err => console.error('Failed updating event status', err));
       }
     }
+    await this.populateOrganizerDetails(events);
     return events;
   }
 
@@ -62,6 +66,7 @@ export class EventService {
         this.eventRepo.save(ev).catch(err => console.error('Failed updating event status', err));
       }
     }
+    await this.populateOrganizerDetails(events);
     return events;
   }
 
@@ -149,6 +154,7 @@ export class EventService {
   async getEventAttendees(eventId: number) {
     return this.eventAttendeesRepo.find({
       where: { eventId },
+      relations: ['attendee', 'admin'],
       order: { registeredAt: 'DESC' }
     });
   }
@@ -166,6 +172,10 @@ export class EventService {
       relations: ['event'],
       order: { registeredAt: 'DESC' }
     });
+    const events = registrations
+      .map((reg) => reg.event)
+      .filter((ev): ev is Event => !!ev);
+    await this.populateOrganizerDetails(events);
     return registrations;
   }
 
@@ -218,6 +228,64 @@ export class EventService {
     // send using EmailService
     await this.emailService.sendRegistrationWithAttachment(ev, registration, buffer, filename, recipientEmail);
     return true;
+  }
+
+  private async populateOrganizerDetails(events: Event[]): Promise<void> {
+    if (!events.length) return;
+
+    const organizerIds = Array.from(
+      new Set(
+        events
+          .map((ev) => {
+            if (!ev.createdBy) return null;
+            const id = Number(ev.createdBy);
+            return Number.isNaN(id) ? null : id;
+          })
+          .filter((id): id is number => id !== null)
+      )
+    );
+
+    if (!organizerIds.length) {
+      events.forEach((ev) => {
+        if (!ev.createdByName) {
+          const composed = `${ev.createdByFirstName || ''} ${ev.createdByLastName || ''}`.trim();
+          ev.createdByName = composed || ev.createdByName || null;
+        }
+      });
+      return;
+    }
+
+    const organizers = await this.organizerRepo.findBy({ id: In(organizerIds) });
+    const organizerMap = new Map<number, Organizer>();
+    organizers.forEach((org) => organizerMap.set(org.id, org));
+
+    events.forEach((ev) => {
+      const organizerId = ev.createdBy ? Number(ev.createdBy) : NaN;
+      if (Number.isNaN(organizerId)) {
+        if (!ev.createdByName) {
+          const composed = `${ev.createdByFirstName || ''} ${ev.createdByLastName || ''}`.trim();
+          ev.createdByName = composed || ev.createdByName || null;
+        }
+        return;
+      }
+
+      const organizer = organizerMap.get(organizerId);
+      if (!organizer) {
+        if (!ev.createdByName) {
+          const fallback = `${ev.createdByFirstName || ''} ${ev.createdByLastName || ''}`.trim();
+          ev.createdByName = fallback || ev.createdByName || null;
+        }
+        return;
+      }
+
+      ev.createdByFirstName = organizer.firstName;
+      ev.createdByLastName = organizer.lastName;
+      ev.createdByEmail = organizer.email;
+      const fullName = `${organizer.firstName || ''} ${organizer.lastName || ''}`.trim();
+      ev.createdByName = fullName || organizer.username || organizer.email;
+      (ev as any).organizerName = ev.createdByName;
+      (ev as any).organizerEmail = organizer.email;
+    });
   }
 }
 

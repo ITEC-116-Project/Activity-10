@@ -566,7 +566,7 @@ const EventDetailsModal = ({ event, onClose, startRegister = false }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+        <div className="modal-header modal-header-row">
           <h2>{event.title}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>

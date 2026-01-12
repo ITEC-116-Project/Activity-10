@@ -126,27 +126,67 @@ const CreateEventModal = ({ onClose, onCreate }) => {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', boxSizing: 'border-box', color: '#111' };
-  const labelStyle = { display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '14px', color: '#222', fontWeight: 600 };
+  const inputStyle = { width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '8px', boxSizing: 'border-box', color: '#111', backgroundColor: '#fff' };
+  const selectStyle = { ...inputStyle, paddingRight: '36px' };
+  const labelStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    fontSize: '13px',
+    color: '#0f766e',
+    fontWeight: 600,
+    textTransform: 'none',
+    letterSpacing: '0.01em'
+  };
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px 32px 16px',
+    borderBottom: '1px solid #e5e7eb'
+  };
+  const bodyStyle = {
+    padding: '24px 32px 32px',
+    display: 'grid',
+    gap: '18px'
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
-        <div className="modal-header">
-          <h2>Create Event</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+      <div
+        className="modal-content modal-large"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '760px', padding: 0, overflow: 'hidden' }}
+      >
+        <div style={headerStyle}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '24px', color: '#0f766e', fontWeight: 700 }}>Create Event</h2>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#6b7280' }}>Share the basics of your upcoming event.</p>
+          </div>
+          <button className="close-button" onClick={onClose} style={{ position: 'static', fontSize: '20px' }}>×</button>
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: '20px 30px' }}>
-          <div style={{ display: 'grid', gap: '12px' }}>
-            <label style={labelStyle}>
-              Title
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required style={inputStyle} />
-            </label>
+        <form onSubmit={handleSubmit} style={bodyStyle}>
+          <label style={labelStyle}>
+            Event Title *
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required style={inputStyle} placeholder="e.g. Tech Conference 2026" />
+          </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <label style={labelStyle}>
+            Description *
+            <textarea
+              rows="4"
+              required
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{ ...inputStyle, resize: 'vertical', minHeight: '110px' }}
+              placeholder="Add a short overview for attendees"
+            />
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <label style={labelStyle}>
-                  Start Date
+                  Date *
                     <input type="date" min={todayLocalISO()} value={startDate} onChange={(e) => {
                       const v = e.target.value;
                       setStartDate(v);
@@ -170,7 +210,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                       }
                     }} required style={inputStyle} />
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                   <select value={startHour} onChange={(e) => {
                     const v = e.target.value;
                     setStartHour(v);
@@ -189,7 +229,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                         if (found) setStartMinute(found);
                       }
                     }
-                  }} style={{ padding: '8px' }}>
+                  }} style={selectStyle}>
                     {Array.from({ length: 12 }).map((_, i) => {
                       const v = String(i+1).padStart(2,'0');
                       // disable hour if all minutes in that hour are already past (when startDate is today)
@@ -207,7 +247,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                       return <option key={v} value={v} disabled={isHourPast}>{v}</option>;
                     })}
                   </select>
-                  <select value={startMinute} onChange={(e) => setStartMinute(e.target.value)} style={{ padding: '8px' }}>
+                  <select value={startMinute} onChange={(e) => setStartMinute(e.target.value)} style={selectStyle}>
                       {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => {
                         // disable minutes that would result in a past time when startDate is today
                         const isPast = (() => {
@@ -245,7 +285,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                         if (found) setStartMinute(found);
                       }
                     }
-                  }} style={{ padding: '8px' }}>
+                  }} style={selectStyle}>
                     <option>AM</option>
                     <option>PM</option>
                   </select>
@@ -254,7 +294,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
 
               <div>
                 <label style={labelStyle}>
-                  End Date
+                  End Date *
                   <input type="date" min={startDate || todayLocalISO()} value={endDate} onChange={(e) => {
                     const v = e.target.value;
                     setEndDate(v);
@@ -276,8 +316,8 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                     }
                   }} required style={inputStyle} />
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                  <select value={endHour} onChange={(e) => setEndHour(e.target.value)} style={{ padding: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <select value={endHour} onChange={(e) => setEndHour(e.target.value)} style={selectStyle}>
                     {Array.from({ length: 12 }).map((_, i) => {
                       const v = String(i+1).padStart(2,'0');
                       const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
@@ -294,7 +334,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                       return <option key={v} value={v} disabled={isHourPast}>{v}</option>;
                     })}
                   </select>
-                  <select value={endMinute} onChange={(e) => setEndMinute(e.target.value)} style={{ padding: '8px' }}>
+                  <select value={endMinute} onChange={(e) => setEndMinute(e.target.value)} style={selectStyle}>
                     {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => {
                       const today = todayLocalISO();
                       if (endDate !== today) return <option key={m} value={m}>{m}</option>;
@@ -311,7 +351,7 @@ const CreateEventModal = ({ onClose, onCreate }) => {
                       return <option key={m} value={m} disabled={isPast}>{m}</option>;
                     })}
                   </select>
-                  <select value={endAMPM} onChange={(e) => setEndAMPM(e.target.value)} style={{ padding: '8px' }}>
+                  <select value={endAMPM} onChange={(e) => setEndAMPM(e.target.value)} style={selectStyle}>
                     <option>AM</option>
                     <option>PM</option>
                   </select>
@@ -320,25 +360,19 @@ const CreateEventModal = ({ onClose, onCreate }) => {
             </div>
 
             <label style={labelStyle}>
-              Location
-              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} required style={inputStyle} />
+              Location *
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} required style={inputStyle} placeholder="Venue or address" />
             </label>
 
             <label style={labelStyle}>
-              Capacity
-              <input type="number" min="0" value={capacity} onChange={(e) => setCapacity(e.target.value)} required style={inputStyle} />
+              Capacity *
+              <input type="number" min="0" value={capacity} onChange={(e) => setCapacity(e.target.value)} required style={inputStyle} placeholder="Expected attendees" />
             </label>
 
-            <label style={labelStyle}>
-              Description
-              <textarea rows="4" value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, resize: 'vertical' }} />
-            </label>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn-primary">Create</button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <button type="button" className="btn-secondary" onClick={onClose} style={{ minWidth: '120px' }}>Cancel</button>
+              <button type="submit" className="btn-primary" style={{ minWidth: '150px' }}>{submitting ? 'Saving...' : 'Create Event'}</button>
             </div>
-          </div>
         </form>
       </div>
     </div>
