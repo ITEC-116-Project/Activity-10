@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete, UseGuards, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -30,6 +30,13 @@ export class EventController {
   async update(@Param('id') id: string, @Body() body: Partial<CreateEventDto>) {
     const num = Number(id);
     return this.svc.update(num, body);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an event' })
+  async delete(@Param('id') id: string) {
+    const num = Number(id);
+    return this.svc.delete(num);
   }
 
   @Post('register')

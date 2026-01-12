@@ -75,6 +75,17 @@ export class EventService {
     return this.eventRepo.findOneBy({ id });
   }
 
+  async delete(id: number) {
+    // First, delete all event attendees registrations for this event
+    await this.eventAttendeesRepo.delete({ eventId: id });
+    // Then delete the event itself
+    const result = await this.eventRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+    return { message: 'Event deleted successfully' };
+  }
+
   async registerForEvent(dto: RegisterForEventDto) {
     // Validate that either attendeeId or adminId is provided
     if (!dto.attendeeId && !dto.adminId) {

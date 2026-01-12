@@ -75,8 +75,8 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
     setCurrentPage(1);
   };
 
-  const handleDelete = (id) => {
-    Swal.fire({
+  const handleDelete = async (id) => {
+    const result = await Swal.fire({
       icon: 'warning',
       title: 'Delete Event',
       text: 'Are you sure you want to delete this event? This action cannot be undone.',
@@ -84,8 +84,20 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
       confirmButtonColor: '#dc2626',
       showCancelButton: true,
       cancelButtonText: 'Cancel'
-    }).then((result) => {
-      if (result.isConfirmed) {
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/events/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to delete event');
+        }
+
         setEvents((prev) => prev.filter((event) => event.id !== id));
         Swal.fire({
           icon: 'success',
@@ -94,8 +106,17 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
           confirmButtonText: 'OK',
           confirmButtonColor: '#0f766e'
         });
+      } catch (err) {
+        console.error('Delete event failed:', err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err.message || 'Failed to delete event. Please try again.',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#dc2626'
+        });
       }
-    });
+    }
   };
 
   return (
@@ -145,6 +166,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
           return matchesSearch && matchesFilter;
         }).slice((currentPage - 1) * 5, currentPage * 5).map(event => {
           const isPast = (event.status || '').toLowerCase() === 'completed' || (event.status || '').toLowerCase() === 'past';
+          const isOngoing = (event.status || '').toLowerCase() === 'ongoing';
           return (
           <div key={event.id} className="event-card">
             <div className="event-header">
@@ -167,7 +189,14 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
               >
                 Edit
               </button>
-              <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+              <button 
+                className="btn-delete" 
+                onClick={() => handleDelete(event.id)}
+                disabled={isOngoing}
+                title={isOngoing ? 'Cannot delete ongoing events' : 'Delete event'}
+              >
+                Delete
+              </button>
             </div>
           </div>
         );
@@ -212,6 +241,7 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
               return matchesSearch && matchesFilter;
             }).slice((currentPage - 1) * 10, currentPage * 10).map(event => {
               const isPast = (event.status || '').toLowerCase() === 'completed' || (event.status || '').toLowerCase() === 'past';
+              const isOngoing = (event.status || '').toLowerCase() === 'ongoing';
               return (
               <tr key={event.id}>
                 <td>{event.title}</td>
@@ -223,7 +253,14 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
                   <button className="btn-secondary" onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }} disabled={isPast} style={{ padding: '6px 12px', fontSize: '13px' }} title={isPast ? 'Cannot edit past events' : 'Edit event'}>Edit</button>
-                  <button className="btn-delete" onClick={() => handleDelete(event.id)}>Delete</button>
+                  <button 
+                    className="btn-delete" 
+                    onClick={() => handleDelete(event.id)}
+                    disabled={isOngoing}
+                    title={isOngoing ? 'Cannot delete ongoing events' : 'Delete event'}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             );

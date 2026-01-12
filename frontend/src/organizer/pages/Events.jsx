@@ -145,8 +145,8 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
 
   const prioritizedEvents = filteredEvents.slice().sort((a, b) => rankStatus(deriveStatusKey(a)) - rankStatus(deriveStatusKey(b)));
 
-  const handleDelete = (id) => {
-    Swal.fire({
+  const handleDelete = async (id) => {
+    const result = await Swal.fire({
       icon: 'warning',
       title: 'Delete Event',
       text: 'Are you sure you want to delete this event? This action cannot be undone.',
@@ -154,8 +154,20 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
       confirmButtonColor: '#dc2626',
       showCancelButton: true,
       cancelButtonText: 'Cancel'
-    }).then((result) => {
-      if (result.isConfirmed) {
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const res = await fetch(`${base}/events/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to delete event');
+        }
+
         setEvents((prev) => {
           const updated = prev.filter((event) => event.id !== id);
           try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
@@ -168,59 +180,32 @@ const Events = ({ initialEventToEdit, onClearEditEvent, onViewActiveEvent }) => 
           confirmButtonText: 'OK',
           confirmButtonColor: '#0f766e'
         });
+      } catch (err) {
+        console.error('Delete event failed:', err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err.message || 'Failed to delete event. Please try again.',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#dc2626'
+        });
       }
-    });
+    }
   };
 
-  const createEvent = (newEvent) => {
-    // Fallback local creation (keeps previous behavior) if API not available
-    (async () => {
-      try {
-        const start = new Date(`${newEvent.date}T${newEvent.startTime}`);
-        const end = new Date(`${newEvent.date}T${newEvent.endTime}`);
-        const payload = {
-          title: newEvent.title,
-          date: start.toISOString(),
-          endDate: end.toISOString(),
-          time: `${newEvent.startTime} - ${newEvent.endTime}`,
-          location: newEvent.location,
-          capacity: Number(newEvent.capacity) || 0,
-          registered: 0,
-          status: (new Date() < start) ? 'upcoming' : ((new Date() >= start && new Date() <= end) ? 'ongoing' : 'completed'),
-          description: newEvent.description || '',
-          createdBy: sessionStorage.getItem('userId') || localStorage.getItem('userId'),
-          createdByName: `${localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || ''} ${localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || ''}`.trim() || 'Organizer',
-          createdByFirstName: localStorage.getItem('firstName') || sessionStorage.getItem('firstName') || '',
-          createdByLastName: localStorage.getItem('lastName') || sessionStorage.getItem('lastName') || '',
-          createdByEmail: localStorage.getItem('email') || sessionStorage.getItem('email') || ''
-        };
+  const createEvent = (createdEvent) => {
+    // CreateEventModal already made the API call and showed success message.
+    // Just update local state with the server-created event.
+    setEvents(prev => {
+      const updated = [createdEvent, ...prev];
+      try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
 
-        const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        const res = await fetch(`${base}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || 'Failed to create event on server');
-        }
-        const created = await res.json();
-
-        // Add to local list shown on this page
-        setEvents(prev => {
-          const updated = [created, ...prev];
-          try { localStorage.setItem('events', JSON.stringify(updated)); } catch { /* ignore */ }
-          return updated;
-        });
-
-        // Notify other pages (Home.jsx) to update immediately
-        try {
-          window.dispatchEvent(new CustomEvent('event:created', { detail: created }));
-        } catch {}
-
-        Swal.fire({ icon: 'success', title: 'Event Created', text: 'New event has been added successfully.', confirmButtonColor: '#0f766e', confirmButtonText: 'OK' });
-      } catch (err) {
-        console.error('Create event error', err);
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not create event. Please try again.', confirmButtonColor: '#ef4444' });
-      }
-    })();
+    // Notify other pages (Home.jsx) to update immediately
+    try {
+      window.dispatchEvent(new CustomEvent('event:created', { detail: createdEvent }));
+    } catch {}
   };
 
   return (
