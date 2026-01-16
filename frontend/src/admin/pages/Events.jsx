@@ -181,22 +181,25 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
             </div>
             <div className="event-actions">
               <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }}>Details</button>
-              <button
-                className="btn-secondary"
-                onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }}
-                disabled={isPast}
-                title={isPast ? 'Cannot edit past events' : 'Edit event'}
-              >
-                Edit
-              </button>
-              <button 
-                className="btn-delete" 
-                onClick={() => handleDelete(event.id)}
-                disabled={isOngoing}
-                title={isOngoing ? 'Cannot delete ongoing events' : 'Delete event'}
-              >
-                Delete
-              </button>
+              {!isOngoing && (
+                <button
+                  className="btn-secondary"
+                  onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }}
+                  disabled={isPast}
+                  title={isPast ? 'Cannot edit past events' : 'Edit event'}
+                >
+                  Edit
+                </button>
+              )}
+              {!isOngoing && (
+                <button 
+                  className="btn-delete" 
+                  onClick={() => handleDelete(event.id)}
+                  title="Delete event"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </div>
         );
@@ -252,15 +255,18 @@ const Events = ({ initialEventToEdit, onClearEditEvent }) => {
                 <td><span className={`status-badge ${event.status}`}>{event.status}</span></td>
                 <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                   <button className="btn-secondary" onClick={() => { setSelectedEvent(event); setShowDetailsModal(true); }} style={{ padding: '6px 12px', fontSize: '13px' }}>View</button>
-                  <button className="btn-secondary" onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }} disabled={isPast} style={{ padding: '6px 12px', fontSize: '13px' }} title={isPast ? 'Cannot edit past events' : 'Edit event'}>Edit</button>
-                  <button 
-                    className="btn-delete" 
-                    onClick={() => handleDelete(event.id)}
-                    disabled={isOngoing}
-                    title={isOngoing ? 'Cannot delete ongoing events' : 'Delete event'}
-                  >
-                    Delete
-                  </button>
+                  {!isOngoing && (
+                    <button className="btn-secondary" onClick={() => { if (isPast) return; setEditEventData(event); setShowEditModal(true); }} disabled={isPast} style={{ padding: '6px 12px', fontSize: '13px' }} title={isPast ? 'Cannot edit past events' : 'Edit event'}>Edit</button>
+                  )}
+                  {!isOngoing && (
+                    <button 
+                      className="btn-delete" 
+                      onClick={() => handleDelete(event.id)}
+                      title="Delete event"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             );

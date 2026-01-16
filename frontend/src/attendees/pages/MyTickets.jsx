@@ -292,20 +292,19 @@ const MyTickets = () => {
               <div className="event-actions">
                 <button className="btn-secondary" onClick={() => setSelectedTicket(t)}>Details</button>
                 <button className="btn-secondary" onClick={() => downloadTicket(t)}>Download</button>
-                <button 
-                  className="btn-secondary" 
-                  style={{ 
-                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', 
-                    color: 'white',
-                    opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
-                    cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
-                  }}
-                  onClick={() => handleCancelRegistration(t.id)}
-                  disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
-                  title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
-                >
-                  Cancel
-                </button>
+                {(t.eventStatus || '').toLowerCase() !== 'ongoing' && (
+                  <button 
+                    className="btn-secondary" 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', 
+                      color: 'white'
+                    }}
+                    onClick={() => handleCancelRegistration(t.id)}
+                    title="Cancel registration"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -347,22 +346,21 @@ const MyTickets = () => {
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn-secondary" onClick={() => setSelectedTicket(t)} style={{ padding: '5px 10px', fontSize: '12px', marginRight: '5px' }}>Details</button>
                     <button className="btn-secondary" onClick={() => downloadTicket(t)} style={{ padding: '5px 10px', fontSize: '12px', marginRight: '5px' }}>Download</button>
-                    <button 
-                      className="btn-secondary" 
-                      style={{ 
-                        background: '#dc2626', 
-                        color: 'white', 
-                        padding: '5px 10px', 
-                        fontSize: '12px',
-                        opacity: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 0.7 : 1,
-                        cursor: (t.eventStatus || '').toLowerCase() === 'ongoing' ? 'not-allowed' : 'pointer'
-                      }}
-                      onClick={() => handleCancelRegistration(t.id)}
-                      disabled={(t.eventStatus || '').toLowerCase() === 'ongoing'}
-                      title={(t.eventStatus || '').toLowerCase() === 'ongoing' ? 'Cannot cancel ongoing events' : 'Cancel registration'}
-                    >
-                      Cancel
-                    </button>
+                    {(t.eventStatus || '').toLowerCase() !== 'ongoing' && (
+                      <button 
+                        className="btn-secondary" 
+                        style={{ 
+                          background: '#dc2626', 
+                          color: 'white', 
+                          padding: '5px 10px', 
+                          fontSize: '12px'
+                        }}
+                        onClick={() => handleCancelRegistration(t.id)}
+                        title="Cancel registration"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
